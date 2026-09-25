@@ -41,6 +41,10 @@ namespace KSPPhysProfiler
         // Assembly tab expand/collapse state
         private HashSet<string> expandedAssemblies = new HashSet<string>();
         private HashSet<string> expandedNamespaces = new HashSet<string>();
+        private HashSet<string> expandedSubsystems = new HashSet<string>();
+        private HashSet<string> expandedTypes = new HashSet<string>();
+        private HashSet<string> expandedMethods = new HashSet<string>();
+        private bool groupBySubsystems = true;
 
         private bool showDetailedAdvice = true;
 
@@ -628,14 +632,41 @@ namespace KSPPhysProfiler
                     ? $"<color=#00e5ff>[TUFX]</color> <color={colorStr}>{p.FriendlyName}</color>"
                     : $"<color={colorStr}>{p.TypeName}</color>";
 
+                string typeKey = "tab1::" + p.TypeName;
+                bool isExp = expandedTypes.Contains(typeKey);
+                string expIcon = p.Methods.Count > 0 ? (isExp ? "▼ " : "▶ ") : "  ";
+
                 GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
-                GUILayout.Label(displayTitle, headerStyle, GUILayout.Width(350));
+                if (GUILayout.Button(expIcon + displayTitle, headerStyle, GUILayout.Width(350)))
+                {
+                    if (p.Methods.Count > 0)
+                    {
+                        if (isExp) expandedTypes.Remove(typeKey);
+                        else expandedTypes.Add(typeKey);
+                    }
+                }
                 GUILayout.Label($"{p.SmoothMs:F3} ms", GUILayout.Width(110));
                 GUILayout.Label($"{p.PeakMs:F2} ms", GUILayout.Width(100));
                 GUILayout.Label($"{p.CurrentFrameCalls}", GUILayout.Width(100));
                 GUILayout.Label($"{pct:F1}%", GUILayout.Width(110));
                 GUILayout.Label($"{p.AssemblyName}", GUILayout.Width(170));
                 GUILayout.EndHorizontal();
+
+                if (isExp && p.Methods.Count > 0)
+                {
+                    foreach (var meth in p.GetSortedMethods())
+                    {
+                        if (meth.SmoothMs < 0.0005 && meth.CurrentFrameCalls == 0) continue;
+                        string mColor = meth.SmoothMs > 2.0 ? "#FF5555" : (meth.SmoothMs > 0.5 ? "#FFBB33" : "#88BBDD");
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Space(24);
+                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.Width(326));
+                        GUILayout.Label($"{meth.SmoothMs:F3} ms", GUILayout.Width(110));
+                        GUILayout.Label($"{meth.PeakMs:F2} ms", GUILayout.Width(100));
+                        GUILayout.Label($"{meth.CurrentFrameCalls}", GUILayout.Width(100));
+                        GUILayout.EndHorizontal();
+                    }
+                }
             }
 
             if (topPlugins.Count == 0)
@@ -723,14 +754,41 @@ namespace KSPPhysProfiler
                 double pct = (m.SmoothMs / totalFrameMs) * 100.0;
                 string colorStr = m.SmoothMs > 4.0 ? "#FF4444" : (m.SmoothMs > 1.2 ? "#FFAA22" : "#FFFFFF");
 
+                string typeKey = "tab2::" + m.TypeName;
+                bool isExp = expandedTypes.Contains(typeKey);
+                string expIcon = m.Methods.Count > 0 ? (isExp ? "▼ " : "▶ ") : "  ";
+
                 GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
-                GUILayout.Label($"<color={colorStr}>{m.TypeName}</color>", headerStyle, GUILayout.Width(350));
+                if (GUILayout.Button($"{expIcon}<color={colorStr}>{m.TypeName}</color>", headerStyle, GUILayout.Width(350)))
+                {
+                    if (m.Methods.Count > 0)
+                    {
+                        if (isExp) expandedTypes.Remove(typeKey);
+                        else expandedTypes.Add(typeKey);
+                    }
+                }
                 GUILayout.Label($"{m.SmoothMs:F3} ms", GUILayout.Width(110));
                 GUILayout.Label($"{m.PeakMs:F2} ms", GUILayout.Width(100));
                 GUILayout.Label($"{m.CurrentFrameCalls}", GUILayout.Width(100));
                 GUILayout.Label($"{pct:F1}%", GUILayout.Width(110));
                 GUILayout.Label($"{m.AssemblyName}", GUILayout.Width(170));
                 GUILayout.EndHorizontal();
+
+                if (isExp && m.Methods.Count > 0)
+                {
+                    foreach (var meth in m.GetSortedMethods())
+                    {
+                        if (meth.SmoothMs < 0.0005 && meth.CurrentFrameCalls == 0) continue;
+                        string mColor = meth.SmoothMs > 2.0 ? "#FF5555" : (meth.SmoothMs > 0.5 ? "#FFBB33" : "#88BBDD");
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Space(24);
+                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.Width(326));
+                        GUILayout.Label($"{meth.SmoothMs:F3} ms", GUILayout.Width(110));
+                        GUILayout.Label($"{meth.PeakMs:F2} ms", GUILayout.Width(100));
+                        GUILayout.Label($"{meth.CurrentFrameCalls}", GUILayout.Width(100));
+                        GUILayout.EndHorizontal();
+                    }
+                }
             }
 
             if (topModules.Count == 0)
@@ -916,10 +974,15 @@ namespace KSPPhysProfiler
             // === Search Bar ===
             GUILayout.BeginHorizontal();
             GUILayout.Label(ProfilerI18n.Get("search_placeholder"), GUILayout.Width(150));
-            searchAssembly = GUILayout.TextField(searchAssembly, GUILayout.Width(260));
+            searchAssembly = GUILayout.TextField(searchAssembly, GUILayout.Width(240));
             if (!string.IsNullOrEmpty(searchAssembly) && GUILayout.Button(ProfilerI18n.Get("clear_search"), GUILayout.Width(60)))
             {
                 searchAssembly = "";
+            }
+            GUILayout.Space(10);
+            if (GUILayout.Button(groupBySubsystems ? ProfilerI18n.Get("subsystem_toggle_on") : ProfilerI18n.Get("subsystem_toggle_off"), GUILayout.Width(170)))
+            {
+                groupBySubsystems = !groupBySubsystems;
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -1016,31 +1079,50 @@ namespace KSPPhysProfiler
                         GUILayout.Label($"{ns.PctOfFrame:F1}%", GUILayout.Width(100));
                         GUILayout.EndHorizontal();
 
-                        // === Expanded: Type detail rows ===
-                        if (nsExpanded && ns.Types != null)
+                        if (nsExpanded)
                         {
-                            int typeLimit = Math.Min(ns.Types.Count, 20);
-                            for (int k = 0; k < typeLimit; k++)
+                            // Subsystem grouping for <global>
+                            if (ns.Namespace == "<global>" && groupBySubsystems && ns.Subsystems != null && ns.Subsystems.Count > 0)
                             {
-                                var t = ns.Types[k];
-                                if (t.SmoothMs < 0.0005 && t.CurrentFrameCalls == 0) continue;
+                                for (int sIdx = 0; sIdx < ns.Subsystems.Count; sIdx++)
+                                {
+                                    var sub = ns.Subsystems[sIdx];
+                                    if (sub.SmoothMs < 0.0005 && sub.TotalCalls == 0) continue;
 
-                                string tColorStr = t.SmoothMs > 2.0 ? "#FF5555" : (t.SmoothMs > 0.5 ? "#FFBB33" : "#88BBDD");
+                                    string subKey = nsKey + "::" + sub.SubsystemId;
+                                    bool subExp = expandedSubsystems.Contains(subKey);
+                                    string subIcon = subExp ? "    ▼ " : "    ▶ ";
+                                    string subColor = sub.SmoothMs > 2.0 ? "#FF8888" : (sub.SmoothMs > 0.5 ? "#FFDD66" : "#CCDDEE");
 
-                                GUILayout.BeginHorizontal();
-                                GUILayout.Space(48);
-                                GUILayout.Label($"<color={tColorStr}>· {t.TypeName}</color>", tipStyle, GUILayout.Width(192));
-                                GUILayout.Label($"{t.SmoothMs:F3} ms", GUILayout.Width(110));
-                                GUILayout.Label($"{t.PeakMs:F2} ms", GUILayout.Width(100));
-                                GUILayout.Label($"{t.CurrentFrameCalls} calls", GUILayout.Width(100));
-                                GUILayout.EndHorizontal();
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Space(36);
+                                    if (GUILayout.Button($"<color={subColor}><b>{subIcon}{sub.DisplayName}</b></color>", tipStyle, GUILayout.Width(204)))
+                                    {
+                                        if (subExp) expandedSubsystems.Remove(subKey);
+                                        else expandedSubsystems.Add(subKey);
+                                    }
+                                    GUILayout.Label($"{sub.SmoothMs:F3} ms", GUILayout.Width(110));
+                                    GUILayout.Label($"{sub.PeakMs:F2} ms", GUILayout.Width(100));
+                                    GUILayout.Label($"{sub.ActiveTypeCount}", GUILayout.Width(100));
+                                    GUILayout.Label($"{sub.TotalCalls}", GUILayout.Width(100));
+                                    GUILayout.Label($"{sub.PctOfFrame:F1}%", GUILayout.Width(100));
+                                    GUILayout.EndHorizontal();
+
+                                    if (subExp && sub.Types != null)
+                                    {
+                                        for (int k = 0; k < sub.Types.Count; k++)
+                                        {
+                                            DrawTypeRowWithMethods(sub.Types[k], 54, subKey);
+                                        }
+                                    }
+                                }
                             }
-                            if (ns.Types.Count > typeLimit)
+                            else if (ns.Types != null)
                             {
-                                GUILayout.BeginHorizontal();
-                                GUILayout.Space(48);
-                                GUILayout.Label($"<color=#8395a7>... +{ns.Types.Count - typeLimit} more types</color>", tipStyle);
-                                GUILayout.EndHorizontal();
+                                for (int k = 0; k < ns.Types.Count; k++)
+                                {
+                                    DrawTypeRowWithMethods(ns.Types[k], 40, nsKey);
+                                }
                             }
                         }
                     }
@@ -1054,6 +1136,93 @@ namespace KSPPhysProfiler
 
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
+        }
+
+        private void DrawTypeRowWithMethods(ModuleStats t, int indent, string parentKey)
+        {
+            if (t.SmoothMs < 0.0005 && t.CurrentFrameCalls == 0) return;
+
+            string typeKey = parentKey + "::" + t.TypeName;
+            bool typeExpanded = expandedTypes.Contains(typeKey);
+            var methods = t.GetSortedMethods();
+            bool hasMethods = methods.Count > 0;
+            string typeIcon = hasMethods ? (typeExpanded ? "▼ " : "▶ ") : "· ";
+
+            string tColorStr = t.SmoothMs > 2.0 ? "#FF5555" : (t.SmoothMs > 0.5 ? "#FFBB33" : "#88BBDD");
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(indent);
+
+            int nameWidth = Math.Max(120, 240 - indent);
+            if (GUILayout.Button($"<color={tColorStr}>{typeIcon}{t.TypeName}</color>", tipStyle, GUILayout.Width(nameWidth)))
+            {
+                if (hasMethods)
+                {
+                    if (typeExpanded) expandedTypes.Remove(typeKey);
+                    else expandedTypes.Add(typeKey);
+                }
+            }
+            GUILayout.Label($"{t.SmoothMs:F3} ms", GUILayout.Width(110));
+            GUILayout.Label($"{t.PeakMs:F2} ms", GUILayout.Width(100));
+            GUILayout.Label($"{t.CurrentFrameCalls} calls", GUILayout.Width(100));
+            GUILayout.EndHorizontal();
+
+            // Expanded methods
+            if (typeExpanded && hasMethods)
+            {
+                for (int mIdx = 0; mIdx < methods.Count; mIdx++)
+                {
+                    var meth = methods[mIdx];
+                    if (meth.SmoothMs < 0.0005 && meth.CurrentFrameCalls == 0) continue;
+
+                    string methKey = typeKey + "::" + meth.MethodName;
+                    bool methExpanded = expandedMethods.Contains(methKey);
+                    var subs = meth.GetSortedSubInvocations();
+                    bool hasSubs = subs.Count > 0;
+                    string methIcon = hasSubs ? (methExpanded ? "  ▼ " : "  ▶ ") : "  · ";
+                    string mColor = meth.SmoothMs > 1.5 ? "#FFAA22" : "#99DDFF";
+
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Space(indent + 16);
+
+                    int methWidth = Math.Max(100, 240 - indent - 16);
+                    if (GUILayout.Button($"<color={mColor}>{methIcon}{meth.MethodName}()</color>", tipStyle, GUILayout.Width(methWidth)))
+                    {
+                        if (hasSubs)
+                        {
+                            if (methExpanded) expandedMethods.Remove(methKey);
+                            else expandedMethods.Add(methKey);
+                        }
+                    }
+                    GUILayout.Label($"{meth.SmoothMs:F3} ms", GUILayout.Width(110));
+                    GUILayout.Label($"{meth.PeakMs:F2} ms", GUILayout.Width(100));
+                    GUILayout.Label($"{meth.CurrentFrameCalls} calls", GUILayout.Width(100));
+                    GUILayout.EndHorizontal();
+
+                    // Expanded Dispatcher Sub-Invocations (e.g. Principia inside TimingPre)
+                    if (methExpanded && hasSubs)
+                    {
+                        for (int sIdx = 0; sIdx < subs.Count; sIdx++)
+                        {
+                            var sub = subs[sIdx];
+                            if (sub.SmoothMs < 0.0005 && sub.CurrentFrameCalls == 0) continue;
+
+                            string sColor = sub.SmoothMs > 1.0 ? "#FF5555" : (sub.SmoothMs > 0.3 ? "#FFAA22" : "#55FF88");
+
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Space(indent + 32);
+
+                            string subDisplay = $"⚡ <color=#00e5ff>[{sub.AssemblyName}]</color> {sub.TypeName}.{sub.MethodName}";
+                            int subWidth = Math.Max(140, 360 - indent - 32);
+                            GUILayout.Label($"<color={sColor}>{subDisplay}</color>", tipStyle, GUILayout.Width(subWidth));
+                            GUILayout.Label($"{sub.SmoothMs:F3} ms", GUILayout.Width(110));
+                            GUILayout.Label($"{sub.PeakMs:F2} ms", GUILayout.Width(100));
+                            GUILayout.Label($"{sub.CurrentFrameCalls} calls", GUILayout.Width(100));
+                            GUILayout.EndHorizontal();
+                        }
+                    }
+                }
+            }
         }
 
         #endregion

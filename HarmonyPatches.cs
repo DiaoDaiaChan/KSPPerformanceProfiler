@@ -26,11 +26,15 @@ namespace KSPPhysProfiler
                 MethodInfo prefixPlugin = typeof(HarmonyPatches).GetMethod(nameof(Plugin_Prefix), BindingFlags.Static | BindingFlags.NonPublic);
                 MethodInfo postfixPlugin = typeof(HarmonyPatches).GetMethod(nameof(Plugin_Postfix), BindingFlags.Static | BindingFlags.NonPublic);
 
+                MethodInfo prefixDispatcher = typeof(HarmonyPatches).GetMethod(nameof(TimingDispatcher_Prefix), BindingFlags.Static | BindingFlags.NonPublic);
+
                 HarmonyMethod prefixModuleHM = new HarmonyMethod(prefixModule);
                 HarmonyMethod postfixModuleHM = new HarmonyMethod(postfixModule);
 
                 HarmonyMethod prefixPluginHM = new HarmonyMethod(prefixPlugin);
                 HarmonyMethod postfixPluginHM = new HarmonyMethod(postfixPlugin);
+
+                HarmonyMethod prefixDispatcherHM = new HarmonyMethod(prefixDispatcher);
 
                 int moduleCount = 0;
                 int pluginCount = 0;
@@ -69,6 +73,10 @@ namespace KSPPhysProfiler
                         }
 
                         bool isPartModule = typeof(PartModule).IsAssignableFrom(t);
+                        bool isTimingDispatcher = (assembly.GetName().Name == "Assembly-CSharp" && (
+                            t.Name == "Timing0" || t.Name == "Timing1" || t.Name == "TimingPre" ||
+                            t.Name == "Timing2" || t.Name == "Timing3" || t.Name == "Timing4" ||
+                            t.Name == "TimingFI" || t.Name == "Timing5" || t.Name == "TimingManager"));
 
                         // Hook FixedUpdate, Update, LateUpdate for all, plus camera/render lifecycle methods for plugins (TUFX, Scatterer, etc.)
                         string[] methodsToHook = isPartModule
@@ -86,6 +94,12 @@ namespace KSPPhysProfiler
                                     {
                                         harmonyInstance.Patch(mi, prefixModuleHM, postfixModuleHM);
                                         moduleCount++;
+                                    }
+                                    else if (isTimingDispatcher && (methodName == "FixedUpdate" || methodName == "Update" || methodName == "LateUpdate"))
+                                    {
+                                        // For timing dispatchers, penetrate the delegate invocation chain
+                                        harmonyInstance.Patch(mi, prefixDispatcherHM, null);
+                                        pluginCount++;
                                     }
                                     else
                                     {
@@ -117,12 +131,13 @@ namespace KSPPhysProfiler
             __state = ProfilerData.IsEnabled ? Stopwatch.GetTimestamp() : 0;
         }
 
-        private static void PartModule_Postfix(PartModule __instance, long __state)
+        private static void PartModule_Postfix(PartModule __instance, MethodBase __originalMethod, long __state)
         {
             if (ProfilerData.IsEnabled && __state > 0 && __instance != null)
             {
                 long elapsed = Stopwatch.GetTimestamp() - __state;
-                ProfilerData.RecordModuleExecution(__instance, elapsed);
+                string methodName = __originalMethod != null ? __originalMethod.Name : "Execute";
+                ProfilerData.RecordModuleExecution(__instance, methodName, elapsed);
             }
         }
 
@@ -131,13 +146,78 @@ namespace KSPPhysProfiler
             __state = ProfilerData.IsEnabled ? Stopwatch.GetTimestamp() : 0;
         }
 
-        private static void Plugin_Postfix(MonoBehaviour __instance, long __state)
+        private static void Plugin_Postfix(MonoBehaviour __instance, MethodBase __originalMethod, long __state)
         {
             if (ProfilerData.IsEnabled && __state > 0 && __instance != null)
             {
                 long elapsed = Stopwatch.GetTimestamp() - __state;
-                ProfilerData.RecordPluginExecution(__instance, elapsed);
+                string methodName = __originalMethod != null ? __originalMethod.Name : "Execute";
+                ProfilerData.RecordPluginExecution(__instance, methodName, elapsed);
             }
+        }
+
+        private static bool TimingDispatcher_Prefix(MonoBehaviour __instance, MethodBase __originalMethod)
+        {
+            if (!ProfilerData.IsEnabled || __instance == null || __originalMethod == null) return true;
+
+            string methodName = __originalMethod.Name;
+            string propName = methodName == "FixedUpdate" ? "onFixedUpdate" : (methodName == "Update" ? "onUpdate" : "onLateUpdate");
+
+            Type t = __instance.GetType();
+            PropertyInfo prop = t.GetProperty(propName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (prop == null) return true;
+
+            Delegate del = prop.GetValue(__instance, null) as Delegate;
+            if (del == null)
+            {
+                ProfilerData.RecordPluginExecution(__instance, methodName, 0);
+                return false;
+            }
+
+            Delegate[] invocationList = del.GetInvocationList();
+            if (invocationList == null || invocationList.Length == 0)
+            {
+                ProfilerData.RecordPluginExecution(__instance, methodName, 0);
+                return false;
+            }
+
+            long totalStart = Stopwatch.GetTimestamp();
+
+            for (int i = 0; i < invocationList.Length; i++)
+            {
+                var item = invocationList[i];
+                if (item == null) continue;
+
+                MethodInfo targetMethod = item.Method;
+                long itemStart = Stopwatch.GetTimestamp();
+                try
+                {
+                    var act = item as TimingManager.UpdateAction;
+                    if (act != null)
+                    {
+                        act();
+                    }
+                    else
+                    {
+                        item.DynamicInvoke(null);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    UnityEngine.Debug.LogError($"[KSPPhysProfiler] Error in {t.Name}.{methodName} callback {targetMethod?.DeclaringType?.FullName}.{targetMethod?.Name}: {ex}");
+                }
+                long itemElapsed = Stopwatch.GetTimestamp() - itemStart;
+
+                if (targetMethod != null)
+                {
+                    ProfilerData.RecordDispatcherSubInvocation(t, methodName, targetMethod, itemElapsed);
+                }
+            }
+
+            long totalElapsed = Stopwatch.GetTimestamp() - totalStart;
+            ProfilerData.RecordPluginExecution(__instance, methodName, totalElapsed);
+
+            return false;
         }
     }
 }

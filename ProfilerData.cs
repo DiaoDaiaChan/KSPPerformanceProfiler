@@ -8,6 +8,114 @@ using UnityEngine;
 
 namespace KSPPhysProfiler
 {
+    public class SubInvocationStats
+    {
+        public string AssemblyName;
+        public string TypeName;
+        public string MethodName;
+        public string DisplayName;
+
+        public long CurrentFrameTicks;
+        public int CurrentFrameCalls;
+        public double SmoothMs;
+        public double PeakMs;
+        public long TotalCalls;
+
+        public void ResetFrame()
+        {
+            CurrentFrameTicks = 0;
+            CurrentFrameCalls = 0;
+        }
+
+        public void Record(long ticks)
+        {
+            CurrentFrameTicks += ticks;
+            CurrentFrameCalls++;
+            TotalCalls++;
+        }
+
+        public void FinalizeFrame(double frameMs, double alpha = 0.1)
+        {
+            SmoothMs = (SmoothMs * (1.0 - alpha)) + (frameMs * alpha);
+            if (frameMs > PeakMs)
+            {
+                PeakMs = frameMs;
+            }
+        }
+    }
+
+    public class MethodStats
+    {
+        public string MethodName;
+        public long CurrentFrameTicks;
+        public int CurrentFrameCalls;
+        public double SmoothMs;
+        public double PeakMs;
+        public long TotalCalls;
+
+        public Dictionary<string, SubInvocationStats> SubInvocations = new Dictionary<string, SubInvocationStats>(StringComparer.Ordinal);
+
+        public MethodStats(string name)
+        {
+            MethodName = name;
+        }
+
+        public void ResetFrame()
+        {
+            CurrentFrameTicks = 0;
+            CurrentFrameCalls = 0;
+            foreach (var sub in SubInvocations.Values)
+            {
+                sub.ResetFrame();
+            }
+        }
+
+        public void Record(long ticks)
+        {
+            CurrentFrameTicks += ticks;
+            CurrentFrameCalls++;
+            TotalCalls++;
+        }
+
+        public void RecordSubInvocation(string subKey, string asmName, string typeName, string methName, long ticks)
+        {
+            if (!SubInvocations.TryGetValue(subKey, out var sub))
+            {
+                sub = new SubInvocationStats
+                {
+                    AssemblyName = asmName,
+                    TypeName = typeName,
+                    MethodName = methName,
+                    DisplayName = $"[{asmName}] {typeName}.{methName}"
+                };
+                SubInvocations[subKey] = sub;
+            }
+            sub.Record(ticks);
+        }
+
+        public void FinalizeFrame(double frameMs, double alpha = 0.1)
+        {
+            SmoothMs = (SmoothMs * (1.0 - alpha)) + (frameMs * alpha);
+            if (frameMs > PeakMs)
+            {
+                PeakMs = frameMs;
+            }
+
+            foreach (var sub in SubInvocations.Values)
+            {
+                double subMs = (double)sub.CurrentFrameTicks / Stopwatch.Frequency * 1000.0;
+                sub.FinalizeFrame(subMs, alpha);
+            }
+        }
+
+        public List<SubInvocationStats> GetSortedSubInvocations()
+        {
+            var list = new List<SubInvocationStats>(SubInvocations.Values);
+            list.Sort((a, b) => b.SmoothMs.CompareTo(a.SmoothMs));
+            return list;
+        }
+    }
+
     public class ModuleStats
     {
         public Type TargetType;
@@ -24,6 +132,8 @@ namespace KSPPhysProfiler
         public double SmoothMs;
         public double PeakMs;
         public long TotalCalls;
+
+        public Dictionary<string, MethodStats> Methods = new Dictionary<string, MethodStats>(StringComparer.Ordinal);
 
         public ModuleStats(Type type)
         {
@@ -69,13 +179,43 @@ namespace KSPPhysProfiler
         {
             CurrentFrameTicks = 0;
             CurrentFrameCalls = 0;
+            foreach (var m in Methods.Values)
+            {
+                m.ResetFrame();
+            }
         }
 
         public void Record(long ticks)
         {
+            Record("Execute", ticks);
+        }
+
+        public void Record(string methodName, long ticks)
+        {
             CurrentFrameTicks += ticks;
             CurrentFrameCalls++;
             TotalCalls++;
+
+            if (!string.IsNullOrEmpty(methodName))
+            {
+                if (!Methods.TryGetValue(methodName, out var mStats))
+                {
+                    mStats = new MethodStats(methodName);
+                    Methods[methodName] = mStats;
+                }
+                mStats.Record(ticks);
+            }
+        }
+
+        public void RecordSubInvocation(string methodName, string subKey, string asmName, string typeName, string methName, long ticks)
+        {
+            if (string.IsNullOrEmpty(methodName)) methodName = "FixedUpdate";
+            if (!Methods.TryGetValue(methodName, out var mStats))
+            {
+                mStats = new MethodStats(methodName);
+                Methods[methodName] = mStats;
+            }
+            mStats.RecordSubInvocation(subKey, asmName, typeName, methName, ticks);
         }
 
         public void FinalizeFrame(double frameMs, double alpha = 0.1)
@@ -85,6 +225,19 @@ namespace KSPPhysProfiler
             {
                 PeakMs = frameMs;
             }
+
+            foreach (var m in Methods.Values)
+            {
+                double mMs = (double)m.CurrentFrameTicks / Stopwatch.Frequency * 1000.0;
+                m.FinalizeFrame(mMs, alpha);
+            }
+        }
+
+        public List<MethodStats> GetSortedMethods()
+        {
+            var list = new List<MethodStats>(Methods.Values);
+            list.Sort((a, b) => b.SmoothMs.CompareTo(a.SmoothMs));
+            return list;
         }
     }
 
@@ -111,6 +264,18 @@ namespace KSPPhysProfiler
         }
     }
 
+    public class SubsystemGroupStats
+    {
+        public string SubsystemId;
+        public string DisplayName;
+        public double SmoothMs;
+        public double PeakMs;
+        public int ActiveTypeCount;
+        public int TotalCalls;
+        public double PctOfFrame;
+        public List<ModuleStats> Types;
+    }
+
     public class AssemblyStats
     {
         public string AssemblyName;
@@ -131,6 +296,49 @@ namespace KSPPhysProfiler
         public int TotalCalls;
         public double PctOfFrame;
         public List<ModuleStats> Types;
+        public List<SubsystemGroupStats> Subsystems;
+    }
+
+    public static class SubsystemCategorizer
+    {
+        public static string Categorize(Type type)
+        {
+            if (type == null) return "subsys_other";
+            string name = type.Name;
+
+            if (name.StartsWith("Timing", StringComparison.OrdinalIgnoreCase))
+                return "subsys_timing";
+
+            if (name == "Vessel" || name == "Part" || name.StartsWith("PartModule") ||
+                name.StartsWith("FlightIntegrator") || name.StartsWith("VesselPrecalculate") ||
+                name == "FlightGlobals" || name.StartsWith("VesselAuto") || name.StartsWith("VesselDeltaV") ||
+                name.StartsWith("VesselValues") || name.StartsWith("StageManager") || name.StartsWith("Module"))
+                return "subsys_vessel";
+
+            if (name.StartsWith("Orbit") || name.StartsWith("PatchedConic") ||
+                name == "CelestialBody" || name.StartsWith("PQS") || name.StartsWith("PSystem") ||
+                name == "Planetarium" || name == "FloatingOrigin" || name == "Krakensbane")
+                return "subsys_celestial";
+
+            if (name.StartsWith("Kerbal") || name == "ProtoCrewMember" || name.StartsWith("Experience"))
+                return "subsys_kerbal";
+
+            if (name.StartsWith("Editor") || name.StartsWith("PartLoader") || name.StartsWith("ShipConstruction") || name.StartsWith("UIPartAction"))
+                return "subsys_editor";
+
+            if (name.StartsWith("FlightInput") || name.StartsWith("FlightCtrl") || name.StartsWith("VesselSAS") || name.StartsWith("VesselControl"))
+                return "subsys_controls";
+
+            if (name.StartsWith("FlightCamera") || name.StartsWith("Camera") || name == "iTween" ||
+                name.StartsWith("FX") || name.EndsWith("FX") || name.StartsWith("Explosion") || name.StartsWith("Audio"))
+                return "subsys_vfx";
+
+            if (name.StartsWith("GameSettings") || name.StartsWith("InputSettings") || name == "Game" ||
+                name.StartsWith("GameEvents") || name.StartsWith("GamePersistence") || name == "HighLogic" || name.StartsWith("KSPLog") || name.StartsWith("KSPUtil"))
+                return "subsys_system";
+
+            return "subsys_other";
+        }
     }
 
     public static class ProfilerData
@@ -407,6 +615,11 @@ namespace KSPPhysProfiler
 
         public static void RecordModuleExecution(PartModule module, long elapsedTicks)
         {
+            RecordModuleExecution(module, "Execute", elapsedTicks);
+        }
+
+        public static void RecordModuleExecution(PartModule module, string methodName, long elapsedTicks)
+        {
             if (!IsEnabled || module == null) return;
             Type mType = module.GetType();
             if (!moduleStatsMap.TryGetValue(mType, out ModuleStats mStats))
@@ -414,7 +627,7 @@ namespace KSPPhysProfiler
                 mStats = new ModuleStats(mType);
                 moduleStatsMap[mType] = mStats;
             }
-            mStats.Record(elapsedTicks);
+            mStats.Record(methodName, elapsedTicks);
 
             if (module.part != null)
             {
@@ -436,6 +649,11 @@ namespace KSPPhysProfiler
 
         public static void RecordPluginExecution(MonoBehaviour plugin, long elapsedTicks)
         {
+            RecordPluginExecution(plugin, "Execute", elapsedTicks);
+        }
+
+        public static void RecordPluginExecution(MonoBehaviour plugin, string methodName, long elapsedTicks)
+        {
             if (!IsEnabled || plugin == null) return;
             Type pType = plugin.GetType();
             if (!pluginStatsMap.TryGetValue(pType, out ModuleStats pStats))
@@ -443,7 +661,24 @@ namespace KSPPhysProfiler
                 pStats = new ModuleStats(pType);
                 pluginStatsMap[pType] = pStats;
             }
-            pStats.Record(elapsedTicks);
+            pStats.Record(methodName, elapsedTicks);
+        }
+
+        public static void RecordDispatcherSubInvocation(Type dispatcherType, string methodName, System.Reflection.MethodInfo targetMethod, long elapsedTicks)
+        {
+            if (!IsEnabled || dispatcherType == null || targetMethod == null) return;
+            if (!pluginStatsMap.TryGetValue(dispatcherType, out ModuleStats pStats))
+            {
+                pStats = new ModuleStats(dispatcherType);
+                pluginStatsMap[dispatcherType] = pStats;
+            }
+
+            string asmName = targetMethod.DeclaringType != null ? targetMethod.DeclaringType.Assembly.GetName().Name : "Unknown";
+            string typeName = targetMethod.DeclaringType != null ? targetMethod.DeclaringType.Name : "Global";
+            string methName = targetMethod.Name;
+            string subKey = $"{asmName}::{typeName}.{methName}";
+
+            pStats.RecordSubInvocation(methodName, subKey, asmName, typeName, methName, elapsedTicks);
         }
 
         public static List<ModuleStats> GetTopModules(int limit = 50, string filter = null, int sortColumn = 1, bool sortAsc = false)
@@ -662,6 +897,53 @@ namespace KSPPhysProfiler
                     // Sort types within namespace by SmoothMs desc
                     nsKvp.Value.Sort((a, b) => b.SmoothMs.CompareTo(a.SmoothMs));
 
+                    List<SubsystemGroupStats> subStatsList = null;
+                    if (nsKvp.Key == "<global>")
+                    {
+                        var subGroups = new Dictionary<string, List<ModuleStats>>(StringComparer.Ordinal);
+                        foreach (var s in nsKvp.Value)
+                        {
+                            string subCat = SubsystemCategorizer.Categorize(s.TargetType);
+                            if (!subGroups.TryGetValue(subCat, out var subList))
+                            {
+                                subList = new List<ModuleStats>();
+                                subGroups[subCat] = subList;
+                            }
+                            subList.Add(s);
+                        }
+
+                        subStatsList = new List<SubsystemGroupStats>(subGroups.Count);
+                        foreach (var subKvp in subGroups)
+                        {
+                            double subSmooth = 0;
+                            double subPeak = 0;
+                            int subActive = 0;
+                            int subCalls = 0;
+                            foreach (var s in subKvp.Value)
+                            {
+                                subSmooth += s.SmoothMs;
+                                if (s.PeakMs > subPeak) subPeak = s.PeakMs;
+                                if (s.SmoothMs > 0.001 || s.CurrentFrameCalls > 0) subActive++;
+                                subCalls += s.CurrentFrameCalls;
+                            }
+
+                            subKvp.Value.Sort((a, b) => b.SmoothMs.CompareTo(a.SmoothMs));
+
+                            subStatsList.Add(new SubsystemGroupStats
+                            {
+                                SubsystemId = subKvp.Key,
+                                DisplayName = ProfilerI18n.Get(subKvp.Key),
+                                SmoothMs = subSmooth,
+                                PeakMs = subPeak,
+                                ActiveTypeCount = subActive,
+                                TotalCalls = subCalls,
+                                PctOfFrame = (subSmooth / totalFrameMs) * 100.0,
+                                Types = subKvp.Value
+                            });
+                        }
+                        subStatsList.Sort((a, b) => b.SmoothMs.CompareTo(a.SmoothMs));
+                    }
+
                     nsList2.Add(new NamespaceStats
                     {
                         Namespace = nsKvp.Key,
@@ -670,7 +952,8 @@ namespace KSPPhysProfiler
                         ActiveTypeCount = nsActive,
                         TotalCalls = nsCalls,
                         PctOfFrame = (nsSmoothMs / totalFrameMs) * 100.0,
-                        Types = nsKvp.Value
+                        Types = nsKvp.Value,
+                        Subsystems = subStatsList
                     });
                 }
                 nsList2.Sort((a, b) => b.SmoothMs.CompareTo(a.SmoothMs));

@@ -22,12 +22,15 @@
   - 🟢 **极度流畅 (Balanced & Smooth)**：物理时钟满速、帧率平稳。
 - **优化建议 (Actionable Advice)**：诊断卡片附带针对性调优策略。
 
-### 2. 程序集与命名空间钻取 (Assembly Breakdown)
+### 2. 程序集与多级深度钻取 (Assembly & Multi-Level Breakdown)
 - **实时 CPU 占用分布条**：直观查看各大 DLL（如 `Assembly-CSharp.dll`、各 Mod DLL）的帧时间占比。
-- **三层深度钻取**：
+- **五层深度级联钻取 (Deep Hierarchical Drill-Down)**：
   - 📦 **程序集层级**：查看各 DLL 的平均耗时、峰值耗时、活跃类型数、调用次数及帧占比。
-  - 📂 **命名空间层级**：点击展开查看命名空间（如 `<global>`、`KSP.UI.Screens`、`Expansions.Missions`、`CommNet` 等）耗时。
-  - 📄 **类型层级**：继续展开查看具体类型的执行开销。
+  - 📂 **命名空间 / 智能子系统层级**：支持一键切换按功能子系统（⏱️ 时钟调度、🚀 载具与动力学、🪐 天体与轨道、👨‍🚀 乘员与出舱、🛠️ 编辑器、🎮 操纵、🎨 视效、⚙️ 系统设置）归类 `<global>` 下的庞大类群。
+  - 📄 **类型层级 (Class / Component)**：查看每个类（如 `TimingPre`、`Planetarium`、`FlightInputHandler`、`ModuleEngines`）的总开销。
+  - ⚙️ **生命周期方法层级 (Methods)**：点击任意类展开查看具体是 `FixedUpdate()`、`Update()`、`LateUpdate()` 还是 `OnRenderImage()` 在耗时。
+  - ⚡ **调度器委托穿透层级 (Dispatcher Penetration)**：深入透视 `TimingPre`、`Timing1`~`Timing5`、`TimingFI`、`TimingManager` 等时间分发器，直观展示挂载在其内部的第三方 Mod 实际回调（如 `[ksp_plugin_adapter] PrincipiaPluginAdapter.Precalc`），彻底揭露“披着原生外衣”的高耗时 Mod！
+- **全局生效**：在【全局插件管理器】与【PartModule 耗时】标签页同样支持点击类名展开方法级明细。
 - **零新增运行时开销**：复用已有拦截数据，UI 刷新 250ms 节流聚合。
 
 ### 3. 多维度性能分析
