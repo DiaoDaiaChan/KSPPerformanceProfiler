@@ -168,6 +168,16 @@
     "graph_frames_600": "600 Frames (~10s)",
     "graph_curve_fps": "Realtime FPS",
     "graph_curve_1pct": "1% Low FPS",
-    "graph_spike_marker_tip": "Red ▼ markers indicate freeze spikes. Click to inspect culprit details."
+    "graph_spike_marker_tip": "Red ▼ markers indicate freeze spikes. Click to inspect culprit details.",
+
+    "asm_bar_title": "Assembly (Mod DLL) Frame Time Share",
+    "bn_btn_hide_advice": "▲ Hide Advice",
+    "bn_btn_show_advice": "▼ Show Advice",
+    "bn_advice_label": "Optimization Advice",
+    "unit_calls": "{0} calls",
+    "culprit_physx": "PhysX Joints & Solver",
+    "culprit_gpu": "GPU Shaders & Render Wait",
+    "culprit_mono_gc": "Mono GC (Garbage Collection)",
+    "culprit_physx_joints": "PhysX Joints & Collisions"
   }
 }

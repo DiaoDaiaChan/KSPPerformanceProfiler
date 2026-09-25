@@ -113,7 +113,7 @@ namespace KSPPhysProfiler
             {
                 candidates.Add(new CulpritItem
                 {
-                    Name = "PhysX Joints & Solver",
+                    Name = ProfilerI18n.Get("culprit_physx"),
                     SourceType = "Engine",
                     SmoothMs = physxMs,
                     PctOfFrame = (physxMs / totalMs) * 100.0,
@@ -125,7 +125,7 @@ namespace KSPPhysProfiler
             {
                 candidates.Add(new CulpritItem
                 {
-                    Name = "GPU Shaders & Render Wait",
+                    Name = ProfilerI18n.Get("culprit_gpu"),
                     SourceType = "GPU",
                     SmoothMs = gpuMs,
                     PctOfFrame = (gpuMs / totalMs) * 100.0,

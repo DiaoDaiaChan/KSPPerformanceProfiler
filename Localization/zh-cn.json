@@ -168,6 +168,16 @@
     "graph_frames_600": "600 帧 (~10s)",
     "graph_curve_fps": "实时 FPS",
     "graph_curve_1pct": "1% Low FPS",
-    "graph_spike_marker_tip": "红点 ▼ 标记帧时间骤升尖峰，点击即可定位分析"
+    "graph_spike_marker_tip": "红点 ▼ 标记帧时间骤升尖峰，点击即可定位分析",
+
+    "asm_bar_title": "各程序集 (Mod DLL) 帧时间占比色条 (Assembly Budget Share)",
+    "bn_btn_hide_advice": "▲ 收起建议",
+    "bn_btn_show_advice": "▼ 查看建议",
+    "bn_advice_label": "优化建议",
+    "unit_calls": "{0} 次",
+    "culprit_physx": "PhysX 物理引擎与关节解算",
+    "culprit_gpu": "GPU 显卡渲染与着色器等待",
+    "culprit_mono_gc": "Mono GC 垃圾回收停顿",
+    "culprit_physx_joints": "PhysX 物理关节与碰撞"
   }
 }

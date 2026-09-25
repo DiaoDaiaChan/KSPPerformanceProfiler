@@ -694,7 +694,7 @@ namespace KSPPhysProfiler
                 {
                     culprits.Add(new SpikeCulprit
                     {
-                        Name = "Mono GC (Garbage Collection)",
+                        Name = ProfilerI18n.Get("culprit_mono_gc"),
                         AssemblyName = "mscorlib (Mono Runtime)",
                         Category = "Mono GC",
                         FrameMs = Math.Max(4.0, TotalFrameMs * 0.25),
@@ -758,7 +758,7 @@ namespace KSPPhysProfiler
             {
                 spikeSnapshot.Culprits.Add(new SpikeCulprit
                 {
-                    Name = "PhysX Joints & Collisions",
+                    Name = ProfilerI18n.Get("culprit_physx_joints"),
                     AssemblyName = "UnityEngine.PhysicsModule",
                     Category = "PhysX",
                     FrameMs = PhysXJointsMs,

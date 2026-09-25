@@ -385,7 +385,7 @@ namespace KSPPhysProfiler
             GUILayout.Label($"<b>{ProfilerI18n.Get("bn_title")}:</b> <color={diag.StatusColorHex}><b>{diag.Title}</b></color>", headerStyle);
             GUILayout.FlexibleSpace();
 
-            if (GUILayout.Button(showDetailedAdvice ? "▲ " + (ProfilerI18n.IsChinese ? "收起建议" : "Hide Advice") : "▼ " + (ProfilerI18n.IsChinese ? "查看建议" : "Show Advice"), GUILayout.Width(100)))
+            if (GUILayout.Button(showDetailedAdvice ? ProfilerI18n.Get("bn_btn_hide_advice") : ProfilerI18n.Get("bn_btn_show_advice"), GUILayout.Width(100)))
             {
                 showDetailedAdvice = !showDetailedAdvice;
             }
@@ -415,7 +415,7 @@ namespace KSPPhysProfiler
             if (showDetailedAdvice && !string.IsNullOrEmpty(diag.Advice))
             {
                 GUILayout.BeginHorizontal("box");
-                GUILayout.Label($"💡 <b>{(ProfilerI18n.IsChinese ? "优化建议" : "Optimization Advice")}:</b> {diag.Advice}", tipStyle);
+                GUILayout.Label($"💡 <b>{ProfilerI18n.Get("bn_advice_label")}:</b> {diag.Advice}", tipStyle);
                 GUILayout.EndHorizontal();
             }
 
@@ -1618,7 +1618,7 @@ namespace KSPPhysProfiler
             GUILayout.EndHorizontal();
 
             GUILayout.Label($"{t.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-            GUILayout.Label($"{t.CurrentFrameCalls} calls", GUILayout.Width(100));
+            GUILayout.Label(ProfilerI18n.Format("unit_calls", t.CurrentFrameCalls), GUILayout.Width(100));
             GUILayout.EndHorizontal();
 
             // Expanded methods
@@ -1655,7 +1655,7 @@ namespace KSPPhysProfiler
                     GUILayout.EndHorizontal();
 
                     GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                    GUILayout.Label($"{meth.CurrentFrameCalls} calls", GUILayout.Width(100));
+                    GUILayout.Label(ProfilerI18n.Format("unit_calls", meth.CurrentFrameCalls), GUILayout.Width(100));
                     GUILayout.EndHorizontal();
 
                     // Expanded Dispatcher Sub-Invocations (e.g. Principia inside TimingPre)
@@ -1681,7 +1681,7 @@ namespace KSPPhysProfiler
                             GUILayout.EndHorizontal();
 
                             GUILayout.Label($"{sub.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                            GUILayout.Label($"{sub.CurrentFrameCalls} calls", GUILayout.Width(100));
+                            GUILayout.Label(ProfilerI18n.Format("unit_calls", sub.CurrentFrameCalls), GUILayout.Width(100));
                             GUILayout.EndHorizontal();
                         }
                     }

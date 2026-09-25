@@ -524,7 +524,7 @@ namespace KSPPhysProfiler
             {
                 var pack = GetActiveLanguagePack();
                 string activeName = pack != null ? pack.Name : "Auto";
-                return $"🌐 自动 ({activeName})";
+                return $"🌐 {Get("lang_auto")} ({activeName})";
             }
 
             if (CurrentPackIndex >= 0 && CurrentPackIndex < AvailablePacks.Count)
@@ -532,7 +532,7 @@ namespace KSPPhysProfiler
                 return $"🌐 {AvailablePacks[CurrentPackIndex].Name}";
             }
 
-            return "🌐 Language";
+            return $"🌐 {Get("lang_label")}";
         }
     }
 }
