@@ -56,9 +56,14 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <LocalizationFiles Include="$(ProjectDir)Localization\*.json" />
+  </ItemGroup>
+
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\GameData\KSPPhysProfiler\Plugins\" ContinueOnError="true" />
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ProjectDir)..\GameData\KSPPhysProfiler\Plugins\" Condition="Exists('$(TargetDir)$(TargetName).pdb')" ContinueOnError="true" />
     <Copy SourceFiles="$(ProjectDir)Icons\icon.png" DestinationFolder="$(ProjectDir)..\GameData\KSPPhysProfiler\Icons\" Condition="Exists('$(ProjectDir)Icons\icon.png')" ContinueOnError="true" />
+    <Copy SourceFiles="@(LocalizationFiles)" DestinationFolder="$(ProjectDir)..\GameData\KSPPhysProfiler\Localization\" ContinueOnError="true" />
   </Target>
 </Project>

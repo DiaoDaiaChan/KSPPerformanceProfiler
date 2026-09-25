@@ -434,6 +434,7 @@ namespace KSPPhysProfiler
         // Ring buffer for FPS & 1% / 0.1% Low analysis (last 300 frames)
         public const int BUFFER_SIZE = 300;
         private static readonly double[] frameTimeHistory = new double[BUFFER_SIZE];
+        private static readonly double[] sortedHistoryBuffer = new double[BUFFER_SIZE];
         private static int bufferIndex = 0;
         private static int historyCount = 0;
 
@@ -456,6 +457,11 @@ namespace KSPPhysProfiler
         {
             SpikeHistory.Clear();
             LatestSpike = null;
+        }
+
+        public static void ClearPartStats()
+        {
+            partStatsMap.Clear();
         }
 
         public static void ToggleFreeze()
@@ -817,33 +823,32 @@ namespace KSPPhysProfiler
                 return;
             }
 
-            // Copy and sort frame times
-            double[] activeHistory = new double[historyCount];
-            Array.Copy(frameTimeHistory, activeHistory, historyCount);
-            Array.Sort(activeHistory);
+            // Copy and sort frame times (zero heap allocation via static reusable buffer)
+            Array.Copy(frameTimeHistory, sortedHistoryBuffer, historyCount);
+            Array.Sort(sortedHistoryBuffer, 0, historyCount);
 
             double sumMs = 0;
-            for (int i = 0; i < historyCount; i++) sumMs += activeHistory[i];
+            for (int i = 0; i < historyCount; i++) sumMs += sortedHistoryBuffer[i];
             double avgMs = sumMs / historyCount;
             AvgFPS = avgMs > 0.0001 ? 1000.0 / avgMs : 0.0;
 
             // 1% Low (99th percentile slowest frame)
             int idx1Pct = (int)Math.Floor(historyCount * 0.99);
             idx1Pct = Math.Min(historyCount - 1, Math.Max(0, idx1Pct));
-            double ms1Pct = activeHistory[idx1Pct];
+            double ms1Pct = sortedHistoryBuffer[idx1Pct];
             OnePercentLowFPS = ms1Pct > 0.0001 ? 1000.0 / ms1Pct : 0.0;
 
             // 0.1% Low (99.9th percentile slowest frame)
             int idx01Pct = (int)Math.Floor(historyCount * 0.999);
             idx01Pct = Math.Min(historyCount - 1, Math.Max(0, idx01Pct));
-            double ms01Pct = activeHistory[idx01Pct];
+            double ms01Pct = sortedHistoryBuffer[idx01Pct];
             PointOnePercentLowFPS = ms01Pct > 0.0001 ? 1000.0 / ms01Pct : 0.0;
 
             // Jitter / Variance calculation
             double varianceSum = 0;
             for (int i = 0; i < historyCount; i++)
             {
-                double diff = activeHistory[i] - avgMs;
+                double diff = sortedHistoryBuffer[i] - avgMs;
                 varianceSum += diff * diff;
             }
             FrameJitterMs = Math.Sqrt(varianceSum / historyCount);

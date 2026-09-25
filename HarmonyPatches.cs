@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using HarmonyLib;
@@ -156,25 +157,54 @@ namespace KSPPhysProfiler
             }
         }
 
+        private struct DispatcherCache
+        {
+            public PropertyInfo Prop;
+            public Delegate CachedDelegate;
+            public Delegate[] CachedList;
+        }
+
+        private static readonly Dictionary<string, DispatcherCache> dispatcherCache = new Dictionary<string, DispatcherCache>(StringComparer.Ordinal);
+
         private static bool TimingDispatcher_Prefix(MonoBehaviour __instance, MethodBase __originalMethod)
         {
             if (!ProfilerData.IsEnabled || __instance == null || __originalMethod == null) return true;
 
             string methodName = __originalMethod.Name;
             string propName = methodName == "FixedUpdate" ? "onFixedUpdate" : (methodName == "Update" ? "onUpdate" : "onLateUpdate");
-
             Type t = __instance.GetType();
-            PropertyInfo prop = t.GetProperty(propName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (prop == null) return true;
 
-            Delegate del = prop.GetValue(__instance, null) as Delegate;
+            string cacheKey = t.FullName + "." + propName;
+            dispatcherCache.TryGetValue(cacheKey, out DispatcherCache cache);
+
+            if (cache.Prop == null)
+            {
+                cache.Prop = t.GetProperty(propName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                dispatcherCache[cacheKey] = cache;
+            }
+
+            if (cache.Prop == null) return true;
+
+            Delegate del = cache.Prop.GetValue(__instance, null) as Delegate;
             if (del == null)
             {
                 ProfilerData.RecordPluginExecution(__instance, methodName, 0);
                 return false;
             }
 
-            Delegate[] invocationList = del.GetInvocationList();
+            Delegate[] invocationList;
+            if (object.ReferenceEquals(del, cache.CachedDelegate) && cache.CachedList != null)
+            {
+                invocationList = cache.CachedList;
+            }
+            else
+            {
+                invocationList = del.GetInvocationList();
+                cache.CachedDelegate = del;
+                cache.CachedList = invocationList;
+                dispatcherCache[cacheKey] = cache;
+            }
+
             if (invocationList == null || invocationList.Length == 0)
             {
                 ProfilerData.RecordPluginExecution(__instance, methodName, 0);

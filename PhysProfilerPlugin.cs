@@ -40,6 +40,10 @@ namespace KSPPhysProfiler
             GameEvents.onGUIApplicationLauncherReady.Add(OnAppLauncherReady);
             GameEvents.onGUIApplicationLauncherDestroyed.Add(OnAppLauncherDestroyed);
 
+            GameEvents.onGameSceneSwitchRequested.Add(OnSceneSwitchRequested);
+            GameEvents.onVesselChange.Add(OnVesselChange);
+            GameEvents.onVesselWillDestroy.Add(OnVesselWillDestroy);
+
             Camera.onPreRender += OnCameraPreRender;
             Camera.onPostRender += OnCameraPostRender;
 
@@ -53,10 +57,30 @@ namespace KSPPhysProfiler
         {
             GameEvents.onGUIApplicationLauncherReady.Remove(OnAppLauncherReady);
             GameEvents.onGUIApplicationLauncherDestroyed.Remove(OnAppLauncherDestroyed);
+
+            GameEvents.onGameSceneSwitchRequested.Remove(OnSceneSwitchRequested);
+            GameEvents.onVesselChange.Remove(OnVesselChange);
+            GameEvents.onVesselWillDestroy.Remove(OnVesselWillDestroy);
+
             OnAppLauncherDestroyed();
 
             Camera.onPreRender -= OnCameraPreRender;
             Camera.onPostRender -= OnCameraPostRender;
+        }
+
+        private void OnSceneSwitchRequested(GameEvents.FromToAction<GameScenes, GameScenes> action)
+        {
+            ProfilerData.ClearPartStats();
+        }
+
+        private void OnVesselChange(Vessel v)
+        {
+            ProfilerData.ClearPartStats();
+        }
+
+        private void OnVesselWillDestroy(Vessel v)
+        {
+            ProfilerData.ClearPartStats();
         }
 
         private void OnCameraPreRender(Camera cam)
@@ -75,10 +99,13 @@ namespace KSPPhysProfiler
             }
         }
 
-        private void Update()
+        private void LateUpdate()
         {
             ProfilerData.UpdateFrameMetrics();
+        }
 
+        private void Update()
+        {
             // Hotkeys:
             // 1. Alt + Shift + P / Ctrl + Shift + P / Keypad Plus (+) => Toggle Full UI
             // 2. Alt + Shift + H / Ctrl + Shift + H => Toggle Mini HUD
