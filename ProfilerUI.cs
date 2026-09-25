@@ -81,6 +81,11 @@ namespace KSPPhysProfiler
         private int lastSortAssemblyCol = -1;
         private bool lastSortAssemblyAsc = false;
 
+        // UI Cache to prevent IMGUI per-frame heap allocations
+        private readonly string[] cachedTabNames = new string[6];
+        private int cachedTabNamesLangPack = -2;
+        private readonly double[] miniSparklineBuffer = new double[50];
+
         // UI Styles
         private GUIStyle headerStyle;
         private GUIStyle tableHeaderStyle;
@@ -237,18 +242,19 @@ namespace KSPPhysProfiler
 
             GUILayout.Space(4);
 
-            // Tab Bar
-            string[] tabNames = new string[]
+            // Tab Bar (cached array to avoid per-frame allocation)
+            if (cachedTabNames[0] == null || cachedTabNamesLangPack != ProfilerI18n.CurrentPackIndex)
             {
-                ProfilerI18n.Get("tab_graph"),
-                ProfilerI18n.Get("tab_plugins"),
-                ProfilerI18n.Get("tab_modules"),
-                ProfilerI18n.Get("tab_parts"),
-                ProfilerI18n.Get("tab_assembly"),
-                ProfilerI18n.Get("tab_help")
-            };
+                cachedTabNamesLangPack = ProfilerI18n.CurrentPackIndex;
+                cachedTabNames[0] = ProfilerI18n.Get("tab_graph");
+                cachedTabNames[1] = ProfilerI18n.Get("tab_plugins");
+                cachedTabNames[2] = ProfilerI18n.Get("tab_modules");
+                cachedTabNames[3] = ProfilerI18n.Get("tab_parts");
+                cachedTabNames[4] = ProfilerI18n.Get("tab_assembly");
+                cachedTabNames[5] = ProfilerI18n.Get("tab_help");
+            }
 
-            selectedTab = GUILayout.Toolbar(selectedTab, tabNames, GUILayout.Height(26));
+            selectedTab = GUILayout.Toolbar(selectedTab, cachedTabNames, GUILayout.Height(26));
             GUILayout.Space(4);
 
             switch (selectedTab)
@@ -1768,8 +1774,8 @@ namespace KSPPhysProfiler
             Rect sparkRect = GUILayoutUtility.GetRect(340, 50);
             GUI.Box(sparkRect, "");
 
-            double[] history = ProfilerData.GetFrameHistorySample(50);
-            if (history != null && history.Length > 1)
+            int sampleCount = ProfilerData.GetFrameHistorySample(miniSparklineBuffer, 50);
+            if (sampleCount > 1)
             {
                 float maxMs = 70f;
                 float innerW = sparkRect.width - 8;
@@ -1777,11 +1783,11 @@ namespace KSPPhysProfiler
                 float innerX = sparkRect.x + 4;
                 float innerY = sparkRect.y + 4;
 
-                for (int i = 0; i < history.Length; i++)
+                for (int i = 0; i < sampleCount; i++)
                 {
-                    float ms = (float)history[i];
+                    float ms = (float)miniSparklineBuffer[i];
                     float barH = Mathf.Clamp((ms / maxMs) * innerH, 2f, innerH);
-                    float barW = innerW / history.Length;
+                    float barW = innerW / sampleCount;
                     float x = innerX + (i * barW);
                     float y = innerY + innerH - barH;
 

@@ -854,6 +854,34 @@ namespace KSPPhysProfiler
             FrameJitterMs = Math.Sqrt(varianceSum / historyCount);
         }
 
+        private static readonly double[] cachedFrameHistoryBuffer = new double[BUFFER_SIZE];
+        private static readonly TimelineSample cachedTimelineSample = new TimelineSample
+        {
+            TotalMs = new double[TIMELINE_BUFFER_SIZE],
+            ModulesMs = new double[TIMELINE_BUFFER_SIZE],
+            PluginsMs = new double[TIMELINE_BUFFER_SIZE],
+            PhysXMs = new double[TIMELINE_BUFFER_SIZE],
+            GpuMs = new double[TIMELINE_BUFFER_SIZE],
+            OverheadMs = new double[TIMELINE_BUFFER_SIZE],
+            Fps = new double[TIMELINE_BUFFER_SIZE],
+            OnePctLow = new double[TIMELINE_BUFFER_SIZE],
+            IsSpike = new bool[TIMELINE_BUFFER_SIZE],
+            SpikeId = new int[TIMELINE_BUFFER_SIZE],
+            Count = 0
+        };
+
+        public static int GetFrameHistorySample(double[] outBuffer, int count = 100)
+        {
+            if (outBuffer == null) return 0;
+            int n = Math.Min(count, Math.Min(historyCount, outBuffer.Length));
+            int startIdx = (bufferIndex - n + BUFFER_SIZE) % BUFFER_SIZE;
+            for (int i = 0; i < n; i++)
+            {
+                outBuffer[i] = frameTimeHistory[(startIdx + i) % BUFFER_SIZE];
+            }
+            return n;
+        }
+
         public static double[] GetFrameHistorySample(int count = 100)
         {
             int n = Math.Min(count, historyCount);
@@ -869,39 +897,25 @@ namespace KSPPhysProfiler
         public static TimelineSample GetTimelineSample(int count = 100)
         {
             int n = Math.Min(count, timelineCount);
-            TimelineSample sample = new TimelineSample
-            {
-                TotalMs = new double[n],
-                ModulesMs = new double[n],
-                PluginsMs = new double[n],
-                PhysXMs = new double[n],
-                GpuMs = new double[n],
-                OverheadMs = new double[n],
-                Fps = new double[n],
-                OnePctLow = new double[n],
-                IsSpike = new bool[n],
-                SpikeId = new int[n],
-                Count = n
-            };
-
-            if (n == 0) return sample;
+            cachedTimelineSample.Count = n;
+            if (n == 0) return cachedTimelineSample;
 
             int startIdx = (timelineIndex - n + TIMELINE_BUFFER_SIZE) % TIMELINE_BUFFER_SIZE;
             for (int i = 0; i < n; i++)
             {
                 int idx = (startIdx + i) % TIMELINE_BUFFER_SIZE;
-                sample.TotalMs[i] = timelineTotalMs[idx];
-                sample.ModulesMs[i] = timelineModulesMs[idx];
-                sample.PluginsMs[i] = timelinePluginsMs[idx];
-                sample.PhysXMs[i] = timelinePhysXMs[idx];
-                sample.GpuMs[i] = timelineGpuMs[idx];
-                sample.OverheadMs[i] = timelineOverheadMs[idx];
-                sample.Fps[i] = timelineFps[idx];
-                sample.OnePctLow[i] = timelineOnePctLow[idx];
-                sample.IsSpike[i] = timelineIsSpike[idx];
-                sample.SpikeId[i] = timelineSpikeId[idx];
+                cachedTimelineSample.TotalMs[i] = timelineTotalMs[idx];
+                cachedTimelineSample.ModulesMs[i] = timelineModulesMs[idx];
+                cachedTimelineSample.PluginsMs[i] = timelinePluginsMs[idx];
+                cachedTimelineSample.PhysXMs[i] = timelinePhysXMs[idx];
+                cachedTimelineSample.GpuMs[i] = timelineGpuMs[idx];
+                cachedTimelineSample.OverheadMs[i] = timelineOverheadMs[idx];
+                cachedTimelineSample.Fps[i] = timelineFps[idx];
+                cachedTimelineSample.OnePctLow[i] = timelineOnePctLow[idx];
+                cachedTimelineSample.IsSpike[i] = timelineIsSpike[idx];
+                cachedTimelineSample.SpikeId[i] = timelineSpikeId[idx];
             }
-            return sample;
+            return cachedTimelineSample;
         }
 
         public static void RecordModuleExecution(PartModule module, long elapsedTicks)
@@ -955,6 +969,16 @@ namespace KSPPhysProfiler
             pStats.Record(methodName, elapsedTicks);
         }
 
+        private class MethodMetaCache
+        {
+            public string AsmName;
+            public string TypeName;
+            public string MethName;
+            public string SubKey;
+        }
+
+        private static readonly Dictionary<System.Reflection.MethodInfo, MethodMetaCache> methodMetaCache = new Dictionary<System.Reflection.MethodInfo, MethodMetaCache>();
+
         public static void RecordDispatcherSubInvocation(Type dispatcherType, string methodName, System.Reflection.MethodInfo targetMethod, long elapsedTicks)
         {
             if (!IsEnabled || dispatcherType == null || targetMethod == null) return;
@@ -964,126 +988,149 @@ namespace KSPPhysProfiler
                 pluginStatsMap[dispatcherType] = pStats;
             }
 
-            string asmName = targetMethod.DeclaringType != null ? targetMethod.DeclaringType.Assembly.GetName().Name : "Unknown";
-            string typeName = targetMethod.DeclaringType != null ? targetMethod.DeclaringType.Name : "Global";
-            string methName = targetMethod.Name;
-            string subKey = $"{asmName}::{typeName}.{methName}";
+            if (!methodMetaCache.TryGetValue(targetMethod, out MethodMetaCache meta))
+            {
+                string asm = targetMethod.DeclaringType != null ? targetMethod.DeclaringType.Assembly.GetName().Name : "Unknown";
+                string type = targetMethod.DeclaringType != null ? targetMethod.DeclaringType.Name : "Global";
+                string meth = targetMethod.Name;
+                meta = new MethodMetaCache
+                {
+                    AsmName = asm,
+                    TypeName = type,
+                    MethName = meth,
+                    SubKey = $"{asm}::{type}.{meth}"
+                };
+                methodMetaCache[targetMethod] = meta;
+            }
 
-            pStats.RecordSubInvocation(methodName, subKey, asmName, typeName, methName, elapsedTicks);
+            pStats.RecordSubInvocation(methodName, meta.SubKey, meta.AsmName, meta.TypeName, meta.MethName, elapsedTicks);
         }
 
         public static List<ModuleStats> GetTopModules(int limit = 50, string filter = null, int sortColumn = 1, bool sortAsc = false)
         {
-            IEnumerable<ModuleStats> query = moduleStatsMap.Values;
+            var list = new List<ModuleStats>(moduleStatsMap.Count);
+            bool hasFilter = !string.IsNullOrEmpty(filter);
 
-            if (!string.IsNullOrEmpty(filter))
+            foreach (var m in moduleStatsMap.Values)
             {
-                query = query.Where(m =>
-                    (m.TypeName != null && m.TypeName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (m.AssemblyName != null && m.AssemblyName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0));
-            }
-            else
-            {
-                query = query.Where(m => m.SmoothMs > 0.001 || m.CurrentFrameCalls > 0);
+                if (hasFilter)
+                {
+                    if ((m.TypeName != null && m.TypeName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (m.AssemblyName != null && m.AssemblyName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        list.Add(m);
+                    }
+                }
+                else
+                {
+                    if (m.SmoothMs > 0.001 || m.CurrentFrameCalls > 0)
+                    {
+                        list.Add(m);
+                    }
+                }
             }
 
+            Comparison<ModuleStats> comp;
             switch (sortColumn)
             {
-                case 0: // Name
-                    query = sortAsc ? query.OrderBy(m => m.TypeName) : query.OrderByDescending(m => m.TypeName);
-                    break;
-                case 1: // Avg Ms
-                    query = sortAsc ? query.OrderBy(m => m.SmoothMs) : query.OrderByDescending(m => m.SmoothMs);
-                    break;
-                case 2: // Peak Ms
-                    query = sortAsc ? query.OrderBy(m => m.PeakMs) : query.OrderByDescending(m => m.PeakMs);
-                    break;
-                case 3: // Calls
-                    query = sortAsc ? query.OrderBy(m => m.CurrentFrameCalls) : query.OrderByDescending(m => m.CurrentFrameCalls);
-                    break;
-                case 4: // Assembly
-                    query = sortAsc ? query.OrderBy(m => m.AssemblyName) : query.OrderByDescending(m => m.AssemblyName);
-                    break;
-                default:
-                    query = query.OrderByDescending(m => m.SmoothMs);
-                    break;
+                case 0: comp = (a, b) => sortAsc ? string.Compare(a.TypeName, b.TypeName, StringComparison.OrdinalIgnoreCase) : string.Compare(b.TypeName, a.TypeName, StringComparison.OrdinalIgnoreCase); break;
+                case 1: comp = (a, b) => sortAsc ? a.SmoothMs.CompareTo(b.SmoothMs) : b.SmoothMs.CompareTo(a.SmoothMs); break;
+                case 2: comp = (a, b) => sortAsc ? a.PeakMs.CompareTo(b.PeakMs) : b.PeakMs.CompareTo(a.PeakMs); break;
+                case 3: comp = (a, b) => sortAsc ? a.CurrentFrameCalls.CompareTo(b.CurrentFrameCalls) : b.CurrentFrameCalls.CompareTo(a.CurrentFrameCalls); break;
+                case 4: comp = (a, b) => sortAsc ? string.Compare(a.AssemblyName, b.AssemblyName, StringComparison.OrdinalIgnoreCase) : string.Compare(b.AssemblyName, a.AssemblyName, StringComparison.OrdinalIgnoreCase); break;
+                default: comp = (a, b) => b.SmoothMs.CompareTo(a.SmoothMs); break;
             }
 
-            return query.Take(limit).ToList();
+            list.Sort(comp);
+            if (list.Count > limit)
+            {
+                list.RemoveRange(limit, list.Count - limit);
+            }
+            return list;
         }
 
         public static List<ModuleStats> GetTopPlugins(int limit = 50, string filter = null, int sortColumn = 1, bool sortAsc = false)
         {
-            IEnumerable<ModuleStats> query = pluginStatsMap.Values;
+            var list = new List<ModuleStats>(pluginStatsMap.Count);
+            bool hasFilter = !string.IsNullOrEmpty(filter);
 
-            if (!string.IsNullOrEmpty(filter))
+            foreach (var p in pluginStatsMap.Values)
             {
-                query = query.Where(p =>
-                    (p.TypeName != null && p.TypeName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (p.AssemblyName != null && p.AssemblyName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0));
-            }
-            else
-            {
-                query = query.Where(p => p.SmoothMs > 0.001 || p.CurrentFrameCalls > 0);
+                if (hasFilter)
+                {
+                    if ((p.TypeName != null && p.TypeName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (p.AssemblyName != null && p.AssemblyName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        list.Add(p);
+                    }
+                }
+                else
+                {
+                    if (p.SmoothMs > 0.001 || p.CurrentFrameCalls > 0)
+                    {
+                        list.Add(p);
+                    }
+                }
             }
 
+            Comparison<ModuleStats> comp;
             switch (sortColumn)
             {
-                case 0: // Name
-                    query = sortAsc ? query.OrderBy(p => p.TypeName) : query.OrderByDescending(p => p.TypeName);
-                    break;
-                case 1: // Avg Ms
-                    query = sortAsc ? query.OrderBy(p => p.SmoothMs) : query.OrderByDescending(p => p.SmoothMs);
-                    break;
-                case 2: // Peak Ms
-                    query = sortAsc ? query.OrderBy(p => p.PeakMs) : query.OrderByDescending(p => p.PeakMs);
-                    break;
-                case 3: // Calls
-                    query = sortAsc ? query.OrderBy(p => p.CurrentFrameCalls) : query.OrderByDescending(p => p.CurrentFrameCalls);
-                    break;
-                case 4: // Assembly
-                    query = sortAsc ? query.OrderBy(p => p.AssemblyName) : query.OrderByDescending(p => p.AssemblyName);
-                    break;
-                default:
-                    query = query.OrderByDescending(p => p.SmoothMs);
-                    break;
+                case 0: comp = (a, b) => sortAsc ? string.Compare(a.TypeName, b.TypeName, StringComparison.OrdinalIgnoreCase) : string.Compare(b.TypeName, a.TypeName, StringComparison.OrdinalIgnoreCase); break;
+                case 1: comp = (a, b) => sortAsc ? a.SmoothMs.CompareTo(b.SmoothMs) : b.SmoothMs.CompareTo(a.SmoothMs); break;
+                case 2: comp = (a, b) => sortAsc ? a.PeakMs.CompareTo(b.PeakMs) : b.PeakMs.CompareTo(a.PeakMs); break;
+                case 3: comp = (a, b) => sortAsc ? a.CurrentFrameCalls.CompareTo(b.CurrentFrameCalls) : b.CurrentFrameCalls.CompareTo(a.CurrentFrameCalls); break;
+                case 4: comp = (a, b) => sortAsc ? string.Compare(a.AssemblyName, b.AssemblyName, StringComparison.OrdinalIgnoreCase) : string.Compare(b.AssemblyName, a.AssemblyName, StringComparison.OrdinalIgnoreCase); break;
+                default: comp = (a, b) => b.SmoothMs.CompareTo(a.SmoothMs); break;
             }
 
-            return query.Take(limit).ToList();
+            list.Sort(comp);
+            if (list.Count > limit)
+            {
+                list.RemoveRange(limit, list.Count - limit);
+            }
+            return list;
         }
 
         public static List<PartStats> GetTopParts(int limit = 40, string filter = null, int sortColumn = 2, bool sortAsc = false)
         {
-            IEnumerable<PartStats> query = partStatsMap.Values;
+            var list = new List<PartStats>(partStatsMap.Count);
+            bool hasFilter = !string.IsNullOrEmpty(filter);
 
-            if (!string.IsNullOrEmpty(filter))
+            foreach (var p in partStatsMap.Values)
             {
-                query = query.Where(p =>
-                    (p.PartTitle != null && p.PartTitle.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (p.VesselName != null && p.VesselName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0));
-            }
-            else
-            {
-                query = query.Where(p => p.SmoothMs > 0.005);
+                if (hasFilter)
+                {
+                    if ((p.PartTitle != null && p.PartTitle.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (p.VesselName != null && p.VesselName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        list.Add(p);
+                    }
+                }
+                else
+                {
+                    if (p.SmoothMs > 0.005)
+                    {
+                        list.Add(p);
+                    }
+                }
             }
 
+            Comparison<PartStats> comp;
             switch (sortColumn)
             {
-                case 0: // Title
-                    query = sortAsc ? query.OrderBy(p => p.PartTitle) : query.OrderByDescending(p => p.PartTitle);
-                    break;
-                case 1: // Vessel
-                    query = sortAsc ? query.OrderBy(p => p.VesselName) : query.OrderByDescending(p => p.VesselName);
-                    break;
-                case 2: // Avg Ms
-                    query = sortAsc ? query.OrderBy(p => p.SmoothMs) : query.OrderByDescending(p => p.SmoothMs);
-                    break;
-                default:
-                    query = query.OrderByDescending(p => p.SmoothMs);
-                    break;
+                case 0: comp = (a, b) => sortAsc ? string.Compare(a.PartTitle, b.PartTitle, StringComparison.OrdinalIgnoreCase) : string.Compare(b.PartTitle, a.PartTitle, StringComparison.OrdinalIgnoreCase); break;
+                case 1: comp = (a, b) => sortAsc ? string.Compare(a.VesselName, b.VesselName, StringComparison.OrdinalIgnoreCase) : string.Compare(b.VesselName, a.VesselName, StringComparison.OrdinalIgnoreCase); break;
+                case 2: comp = (a, b) => sortAsc ? a.SmoothMs.CompareTo(b.SmoothMs) : b.SmoothMs.CompareTo(a.SmoothMs); break;
+                default: comp = (a, b) => b.SmoothMs.CompareTo(a.SmoothMs); break;
             }
 
-            return query.Take(limit).ToList();
+            list.Sort(comp);
+            if (list.Count > limit)
+            {
+                list.RemoveRange(limit, list.Count - limit);
+            }
+            return list;
         }
 
         public static void ResetAllPeakData()

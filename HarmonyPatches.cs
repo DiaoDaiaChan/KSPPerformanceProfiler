@@ -127,6 +127,8 @@ namespace KSPPhysProfiler
             }
         }
 
+        private static readonly Dictionary<MethodBase, string> methodNameCache = new Dictionary<MethodBase, string>();
+
         private static void PartModule_Prefix(out long __state)
         {
             __state = ProfilerData.IsEnabled ? Stopwatch.GetTimestamp() : 0;
@@ -137,7 +139,11 @@ namespace KSPPhysProfiler
             if (ProfilerData.IsEnabled && __state > 0 && __instance != null)
             {
                 long elapsed = Stopwatch.GetTimestamp() - __state;
-                string methodName = __originalMethod != null ? __originalMethod.Name : "Execute";
+                if (!methodNameCache.TryGetValue(__originalMethod, out string methodName))
+                {
+                    methodName = __originalMethod != null ? __originalMethod.Name : "Execute";
+                    methodNameCache[__originalMethod] = methodName;
+                }
                 ProfilerData.RecordModuleExecution(__instance, methodName, elapsed);
             }
         }
@@ -152,7 +158,11 @@ namespace KSPPhysProfiler
             if (ProfilerData.IsEnabled && __state > 0 && __instance != null)
             {
                 long elapsed = Stopwatch.GetTimestamp() - __state;
-                string methodName = __originalMethod != null ? __originalMethod.Name : "Execute";
+                if (!methodNameCache.TryGetValue(__originalMethod, out string methodName))
+                {
+                    methodName = __originalMethod != null ? __originalMethod.Name : "Execute";
+                    methodNameCache[__originalMethod] = methodName;
+                }
                 ProfilerData.RecordPluginExecution(__instance, methodName, elapsed);
             }
         }
