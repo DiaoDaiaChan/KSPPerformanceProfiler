@@ -82,9 +82,11 @@ namespace KSPPhysProfiler
         private bool lastSortAssemblyAsc = false;
 
         // UI Cache to prevent IMGUI per-frame heap allocations
-        private readonly string[] cachedTabNames = new string[6];
+        private readonly string[] cachedTabNames = new string[5];
+        private readonly string[] cachedSubTabNames = new string[2];
         private int cachedTabNamesLangPack = -2;
         private readonly double[] miniSparklineBuffer = new double[50];
+        private int subTabScripts = 0;
 
         // UI Styles
         private GUIStyle headerStyle;
@@ -235,47 +237,44 @@ namespace KSPPhysProfiler
         {
             GUILayout.BeginVertical();
 
-            DrawTopMetricBar();
-            DrawToolbar();
-            DrawBottleneckDiagnosticCard();
-            DrawMacroBudgetBar();
+            DrawHeaderHUD();
+            DrawHeroKillerCard();
 
-            GUILayout.Space(4);
+            GUILayout.Space(2);
 
             // Tab Bar (cached array to avoid per-frame allocation)
             if (cachedTabNames[0] == null || cachedTabNamesLangPack != ProfilerI18n.CurrentPackIndex)
             {
                 cachedTabNamesLangPack = ProfilerI18n.CurrentPackIndex;
-                cachedTabNames[0] = ProfilerI18n.Get("tab_graph");
-                cachedTabNames[1] = ProfilerI18n.Get("tab_plugins");
-                cachedTabNames[2] = ProfilerI18n.Get("tab_modules");
-                cachedTabNames[3] = ProfilerI18n.Get("tab_parts");
-                cachedTabNames[4] = ProfilerI18n.Get("tab_assembly");
-                cachedTabNames[5] = ProfilerI18n.Get("tab_help");
+                cachedTabNames[0] = ProfilerI18n.Get("tab_dashboard");
+                cachedTabNames[1] = ProfilerI18n.Get("tab_scripts");
+                cachedTabNames[2] = ProfilerI18n.Get("tab_parts");
+                cachedTabNames[3] = ProfilerI18n.Get("tab_assembly");
+                cachedTabNames[4] = ProfilerI18n.Get("tab_settings");
+
+                cachedSubTabNames[0] = ProfilerI18n.Get("subtab_plugins");
+                cachedSubTabNames[1] = ProfilerI18n.Get("subtab_modules");
             }
 
             selectedTab = GUILayout.Toolbar(selectedTab, cachedTabNames, GUILayout.Height(26));
-            GUILayout.Space(4);
+            GUILayout.Space(2);
 
             switch (selectedTab)
             {
                 case 0:
-                    DrawFpsGraphTab();
+                    DrawDashboardTab();
                     break;
                 case 1:
-                    DrawPluginsTab();
+                    DrawScriptsTab();
                     break;
                 case 2:
-                    DrawModulesTab();
-                    break;
-                case 3:
                     DrawPartsTab();
                     break;
-                case 4:
+                case 3:
                     DrawAssemblyTab();
                     break;
-                case 5:
-                    DrawHelpTab();
+                case 4:
+                    DrawSettingsAndHelpTab();
                     break;
             }
 
@@ -283,7 +282,7 @@ namespace KSPPhysProfiler
             GUI.DragWindow();
         }
 
-        private void DrawTopMetricBar()
+        private void DrawHeaderHUD()
         {
             double ptr = ProfilerData.SmoothPTR * 100.0;
             string ptrColor = ptr >= 85.0 ? "#33FF33" : (ptr >= 60.0 ? "#FFFF33" : "#FF3333");
@@ -301,73 +300,36 @@ namespace KSPPhysProfiler
 
             GUILayout.BeginHorizontal(cardStyle);
 
-            // PTR Badge
-            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_ptr")}:</b> <color={ptrColor}><b>{ptrStatusText}</b></color>", ptrStyle, GUILayout.Width(170));
+            // Mod Brand & Status Dot
+            string statusDot = ProfilerData.IsEnabled ? "<color=#33FF33>●</color>" : "<color=#888888>○</color>";
+            GUILayout.Label($"{statusDot} <b>KSPPhysProfiler</b>", headerStyle, GUILayout.Width(140));
 
-            // FPS & Avg FPS Badge
-            GUILayout.Label($"<b>FPS:</b> <color={fpsColor}><b>{fps:F1}</b></color> (Avg: {avgFps:F1})", fpsStyle, GUILayout.Width(190));
+            // Core Telemetry Badges
+            GUILayout.Label($"<b>FPS:</b> <color={fpsColor}><b>{fps:F1}</b></color> (Avg: {avgFps:F1})", fpsStyle, GUILayout.Width(140));
+            GUILayout.Label($"<b>1% Low:</b> <color={fps1Color}><b>{fps1pct:F1}</b></color>", fpsStyle, GUILayout.Width(100));
+            GUILayout.Label($"<b>PTR:</b> <color={ptrColor}><b>{ptrStatusText}</b></color>", ptrStyle, GUILayout.Width(95));
+            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_total_frame")}:</b> {ProfilerData.SmoothTotalFrameMs:F1}ms (<color={jitterColor}>{jitter:F1}ms</color>)", headerStyle, GUILayout.Width(170));
 
-            // 1% Low & 0.1% Low
-            GUILayout.Label($"<b>1% Low:</b> <color={fps1Color}><b>{fps1pct:F1}</b></color> | <b>0.1% Low:</b> {ProfilerData.PointOnePercentLowFPS:F1}", fpsStyle, GUILayout.Width(250));
+            GUILayout.FlexibleSpace();
 
-            // Jitter
-            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_jitter")}:</b> <color={jitterColor}><b>{jitter:F2} ms</b></color>", headerStyle, GUILayout.Width(180));
-
-            // Total Frame
-            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_total_frame")}:</b> {ProfilerData.SmoothTotalFrameMs:F1} ms", headerStyle);
-
-            GUILayout.EndHorizontal();
-        }
-
-        private void DrawToolbar()
-        {
-            GUILayout.BeginHorizontal();
-
-            // Toggle profiling
-            bool newEnabled = GUILayout.Toggle(ProfilerData.IsEnabled, $" {ProfilerI18n.Get(ProfilerData.IsEnabled ? "enabled" : "disabled")}", GUILayout.Width(140));
-            if (newEnabled != ProfilerData.IsEnabled)
+            // Toggle Profiling button
+            string toggleText = ProfilerData.IsEnabled ? ProfilerI18n.Get("enabled") : ProfilerI18n.Get("disabled");
+            Color oldCol = GUI.color;
+            if (!ProfilerData.IsEnabled) GUI.color = new Color(1f, 0.6f, 0.6f, 1f);
+            if (GUILayout.Button(toggleText, GUILayout.Width(105), GUILayout.Height(22)))
             {
-                ProfilerData.IsEnabled = newEnabled;
+                ProfilerData.IsEnabled = !ProfilerData.IsEnabled;
             }
+            GUI.color = oldCol;
 
-            // Reset peak
-            if (GUILayout.Button(ProfilerI18n.Get("reset_peak"), GUILayout.Width(110)))
-            {
-                ProfilerData.ResetAllPeakData();
-            }
-
-            // Export Report
-            if (GUILayout.Button(ProfilerI18n.Get("export_dump"), GUILayout.Width(140)))
-            {
-                PhysProfilerPlugin.Instance.ExportReportToFile();
-            }
-
-            // Language Switcher Button
-            if (GUILayout.Button(ProfilerI18n.GetCurrentLanguageButtonText(), GUILayout.Width(150)))
-            {
-                ProfilerI18n.ToggleNextLanguage();
-            }
-
-            // Mini HUD Toggle Button
-            if (GUILayout.Button($"🗖 {ProfilerI18n.Get("mode_mini")}", GUILayout.Width(110)))
+            // Mini HUD Button
+            if (GUILayout.Button($"🗖 {ProfilerI18n.Get("mode_mini")}", GUILayout.Width(85), GUILayout.Height(22)))
             {
                 IsMiniHud = true;
             }
 
-            // Sort Lock & Anti-Flicker Toggle
-            string sortLockText = isSortLocked ? ProfilerI18n.Get("sort_lock_on") : ProfilerI18n.Get("sort_lock_off");
-            if (GUILayout.Button(sortLockText, GUILayout.Width(110)))
-            {
-                isSortLocked = !isSortLocked;
-            }
-
-            GUILayout.FlexibleSpace();
-
-            // Patched counters info
-            GUILayout.Label(string.Format(ProfilerI18n.Get("patched_stats"), HarmonyPatches.PatchedModuleCount, HarmonyPatches.PatchedPluginCount), tipStyle);
-
-            // Close button
-            if (GUILayout.Button("✕", GUILayout.Width(28), GUILayout.Height(22)))
+            // Close Button
+            if (GUILayout.Button("✕", GUILayout.Width(26), GUILayout.Height(22)))
             {
                 PhysProfilerPlugin.Instance.SetUIVisibility(false);
             }
@@ -375,35 +337,76 @@ namespace KSPPhysProfiler
             GUILayout.EndHorizontal();
         }
 
-        private void DrawBottleneckDiagnosticCard()
+        private void DrawHeroKillerCard()
         {
             var diag = GetCachedDiagnostic();
 
             GUILayout.BeginVertical(cardAccentStyle);
 
+            // Row 1: Diagnosis Hero Banner & Auto-Freeze Trigger
             GUILayout.BeginHorizontal();
-            GUILayout.Label($"<b>{ProfilerI18n.Get("bn_title")}:</b> <color={diag.StatusColorHex}><b>{diag.Title}</b></color>", headerStyle);
+
+            if (ProfilerData.IsFrozen)
+            {
+                GUI.color = new Color(1f, 0.85f, 0.3f, 1f);
+                GUILayout.Label($"<b>{ProfilerI18n.Get("hero_frozen_banner")}</b>", headerStyle);
+                GUI.color = Color.white;
+            }
+            else
+            {
+                GUILayout.Label($"<b>{ProfilerI18n.Get("hero_killer_title")}:</b> <color={diag.StatusColorHex}><b>{diag.Title}</b></color>", headerStyle);
+            }
+
             GUILayout.FlexibleSpace();
 
-            if (GUILayout.Button(showDetailedAdvice ? ProfilerI18n.Get("bn_btn_hide_advice") : ProfilerI18n.Get("bn_btn_show_advice"), GUILayout.Width(100)))
+            // Resume button if frozen
+            if (ProfilerData.IsFrozen)
+            {
+                Color prevCol = GUI.backgroundColor;
+                GUI.backgroundColor = new Color(1f, 0.85f, 0.2f, 1f);
+                if (GUILayout.Button($"<b>{ProfilerI18n.Get("hero_unfreeze_btn")}</b>", GUILayout.Width(130), GUILayout.Height(23)))
+                {
+                    ProfilerData.IsFrozen = false;
+                }
+                GUI.backgroundColor = prevCol;
+                GUILayout.Space(6);
+            }
+
+            // KILLER FEATURE: Auto-Freeze Toggle Button
+            string freezeBtnText = ProfilerData.AutoFreezeOnSpike ? ProfilerI18n.Get("hero_auto_freeze_on") : ProfilerI18n.Get("hero_auto_freeze_off");
+            Color prevBg = GUI.backgroundColor;
+            if (ProfilerData.AutoFreezeOnSpike)
+            {
+                GUI.backgroundColor = new Color(0.2f, 0.85f, 0.4f, 1f);
+            }
+            if (GUILayout.Button(freezeBtnText, GUILayout.Width(160), GUILayout.Height(23)))
+            {
+                ProfilerData.AutoFreezeOnSpike = !ProfilerData.AutoFreezeOnSpike;
+            }
+            GUI.backgroundColor = prevBg;
+
+            GUILayout.Space(6);
+
+            // Detailed Advice Toggle
+            string adviceToggle = showDetailedAdvice ? ProfilerI18n.Get("bn_btn_hide_advice") : ProfilerI18n.Get("bn_btn_show_advice");
+            if (GUILayout.Button(adviceToggle, GUILayout.Width(85), GUILayout.Height(23)))
             {
                 showDetailedAdvice = !showDetailedAdvice;
             }
+
             GUILayout.EndHorizontal();
 
-            GUILayout.Label(diag.Description, tipStyle);
-
-            // Top offenders tags
+            // Row 2: Top Offenders Direct Exposure
             if (diag.TopCulprits != null && diag.TopCulprits.Count > 0)
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label($"<b>{ProfilerI18n.Get("bn_top_culprits")}</b>", tipStyle, GUILayout.Width(180));
+                GUILayout.Label($"<b>{ProfilerI18n.Get("hero_top_culprits")}</b>", tipStyle, GUILayout.Width(105));
 
                 for (int i = 0; i < diag.TopCulprits.Count; i++)
                 {
                     var c = diag.TopCulprits[i];
                     string colorStr = c.PctOfFrame > 20.0 ? "#FF5555" : (c.PctOfFrame > 10.0 ? "#FFAA22" : "#55FF88");
-                    string badgeText = $"#{i + 1} [{c.SourceType}] <b>{c.Name}</b> (<color={colorStr}>{c.SmoothMs:F2}ms, {c.PctOfFrame:F1}%</color>)";
+                    string badgeText = $"<b>#{i + 1}</b> [{c.SourceType}] <b>{c.Name}</b> (<color={colorStr}>{c.SmoothMs:F1}ms, {c.PctOfFrame:F1}%</color>)";
                     GUILayout.Label(badgeText, tipStyle);
                     GUILayout.Space(8);
                 }
@@ -412,6 +415,7 @@ namespace KSPPhysProfiler
                 GUILayout.EndHorizontal();
             }
 
+            // Row 3: Actionable Prescription (if expanded)
             if (showDetailedAdvice && !string.IsNullOrEmpty(diag.Advice))
             {
                 GUILayout.BeginHorizontal("box");
@@ -419,10 +423,13 @@ namespace KSPPhysProfiler
                 GUILayout.EndHorizontal();
             }
 
+            // Row 4: Macro Budget Bar Strip
+            DrawMacroBudgetBarStrip();
+
             GUILayout.EndVertical();
         }
 
-        private void DrawMacroBudgetBar()
+        private void DrawMacroBudgetBarStrip()
         {
             double totalMs = Math.Max(0.001, ProfilerData.SmoothTotalFrameMs);
             double modMs = ProfilerData.SmoothModuleScriptMs;
@@ -437,18 +444,14 @@ namespace KSPPhysProfiler
             float pGpu = (float)(gpuMs / totalMs);
             float pOverhead = (float)(overheadMs / totalMs);
 
-            GUILayout.BeginVertical(cardStyle);
-
-            // Bar drawing
-            Rect barRect = GUILayoutUtility.GetRect(960, 14);
+            Rect barRect = GUILayoutUtility.GetRect(960, 10);
             GUI.Box(barRect, "");
 
-            float currentX = barRect.x + 2;
-            float barY = barRect.y + 2;
-            float totalBarW = barRect.width - 4;
-            float barH = barRect.height - 4;
+            float currentX = barRect.x + 1;
+            float barY = barRect.y + 1;
+            float totalBarW = barRect.width - 2;
+            float barH = barRect.height - 2;
 
-            // Colors
             Color colMod = new Color(0f, 0.82f, 0.83f, 0.95f);       // Cyan
             Color colPlugin = new Color(0.63f, 0.61f, 0.99f, 0.95f);  // Violet
             Color colPhysx = new Color(1f, 0.62f, 0.26f, 0.95f);     // Orange
@@ -463,16 +466,14 @@ namespace KSPPhysProfiler
 
             GUI.color = Color.white;
 
-            // Interactive Legend
             GUILayout.BeginHorizontal();
-            GUILayout.Label($"<color=#00d2d3>■</color> <b>{ProfilerI18n.Get("legend_modules")}:</b> {modMs:F1}ms ({(pMod * 100f):F1}%)", tipStyle);
-            GUILayout.Label($"<color=#a29bfe>■</color> <b>{ProfilerI18n.Get("legend_plugins")}:</b> {pluginMs:F1}ms ({(pPlugin * 100f):F1}%)", tipStyle);
-            GUILayout.Label($"<color=#ff9f43>■</color> <b>{ProfilerI18n.Get("legend_physx")}:</b> {physxMs:F1}ms ({(pPhysx * 100f):F1}%)", tipStyle);
-            GUILayout.Label($"<color=#feca57>■</color> <b>{ProfilerI18n.Get("legend_gpu")}:</b> {gpuMs:F1}ms ({(pGpu * 100f):F1}%)", tipStyle);
-            GUILayout.Label($"<color=#8395a7>■</color> <b>{ProfilerI18n.Get("legend_overhead")}:</b> {overheadMs:F1}ms ({(pOverhead * 100f):F1}%)", tipStyle);
+            GUILayout.Label($"<color=#00d2d3>■</color> {ProfilerI18n.Get("legend_modules")}: {modMs:F1}ms ({(pMod * 100f):F0}%)", tipStyle);
+            GUILayout.Label($"<color=#a29bfe>■</color> {ProfilerI18n.Get("legend_plugins")}: {pluginMs:F1}ms ({(pPlugin * 100f):F0}%)", tipStyle);
+            GUILayout.Label($"<color=#ff9f43>■</color> {ProfilerI18n.Get("legend_physx")}: {physxMs:F1}ms ({(pPhysx * 100f):F0}%)", tipStyle);
+            GUILayout.Label($"<color=#feca57>■</color> {ProfilerI18n.Get("legend_gpu")}: {gpuMs:F1}ms ({(pGpu * 100f):F0}%)", tipStyle);
+            GUILayout.Label($"<color=#8395a7>■</color> {ProfilerI18n.Get("legend_overhead")}: {overheadMs:F1}ms ({(pOverhead * 100f):F0}%)", tipStyle);
+            GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-
-            GUILayout.EndVertical();
         }
 
         private void DrawBarSegment(ref float currentX, float y, float width, float height, Color color)
@@ -508,60 +509,71 @@ namespace KSPPhysProfiler
 
         #endregion
 
-        #region Tab 0: FPS & Frame Time Graph
+        #region Tab 0: Dashboard & Spike Sniffer
 
-        private void DrawFpsGraphTab()
+        private void DrawDashboardTab()
         {
             scrollPosGraph = GUILayout.BeginScrollView(scrollPosGraph);
+            GUILayout.BeginVertical();
+
+            // 1. Spike Sniffer (Hero Stutter Inspector - 置顶杀手级抓拍)
+            DrawSpikeSnifferCard();
+
+            GUILayout.Space(4);
+
+            // 2. Timeline Waveform Graph (彻底修复横向重叠)
+            DrawTimelineGraphCard();
+
+            GUILayout.EndVertical();
+            GUILayout.EndScrollView();
+        }
+
+        private void DrawTimelineGraphCard()
+        {
             GUILayout.BeginVertical(cardStyle);
 
-            // Controls Toolbar
+            // Controls Toolbar Row 1: Title on left, Mode buttons on right
             GUILayout.BeginHorizontal();
             GUILayout.Label($"<b>{ProfilerI18n.Get("graph_title")}</b>", headerStyle);
             GUILayout.FlexibleSpace();
 
-            // Mode switch
-            if (GUILayout.Button(ProfilerI18n.Get("graph_mode_stacked"), graphMode == 0 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(150)))
+            if (GUILayout.Button(ProfilerI18n.Get("graph_mode_stacked"), graphMode == 0 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(140), GUILayout.Height(22)))
             {
                 graphMode = 0;
             }
-            if (GUILayout.Button(ProfilerI18n.Get("graph_mode_curve"), graphMode == 1 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(170)))
+            if (GUILayout.Button(ProfilerI18n.Get("graph_mode_curve"), graphMode == 1 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(170), GUILayout.Height(22)))
             {
                 graphMode = 1;
             }
+            GUILayout.EndHorizontal();
 
-            GUILayout.Space(8);
+            // Controls Toolbar Row 2: Legend on left, Time Span buttons on right (NO OVERLAP!)
+            GUILayout.BeginHorizontal();
+            if (graphMode == 0)
+            {
+                GUILayout.Label($"<color=#33ff55>―</color> 60FPS  <color=#00d2d3>■</color> {ProfilerI18n.Get("legend_modules")}  <color=#a29bfe>■</color> {ProfilerI18n.Get("legend_plugins")}  <color=#ff9f43>■</color> {ProfilerI18n.Get("legend_physx")}  <color=#feca57>■</color> {ProfilerI18n.Get("legend_gpu")}  <color=#ff5555>▼</color> 尖峰", tipStyle);
+            }
+            else
+            {
+                GUILayout.Label($"<color=#33ff55>―</color> 60FPS  <color=#ffaa22>―</color> 30FPS  <color=#33ff55>■</color> {ProfilerI18n.Get("graph_curve_fps")}  <color=#ffaa22>■</color> {ProfilerI18n.Get("graph_curve_1pct")}", tipStyle);
+            }
+
+            GUILayout.FlexibleSpace();
             GUILayout.Label(ProfilerI18n.Get("graph_scale_label"), tipStyle);
 
-            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_100"), graphTimeRange == 100 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(95)))
+            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_100"), graphTimeRange == 100 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(90), GUILayout.Height(20)))
             {
                 graphTimeRange = 100;
             }
-            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_300"), graphTimeRange == 300 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(95)))
+            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_300"), graphTimeRange == 300 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(90), GUILayout.Height(20)))
             {
                 graphTimeRange = 300;
             }
-            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_600"), graphTimeRange == 600 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(95)))
+            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_600"), graphTimeRange == 600 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(90), GUILayout.Height(20)))
             {
                 graphTimeRange = 600;
             }
-
             GUILayout.EndHorizontal();
-
-            // Frozen notification banner if frozen
-            if (ProfilerData.IsFrozen)
-            {
-                GUILayout.BeginHorizontal("box");
-                GUI.color = new Color(1f, 0.85f, 0.3f, 1f);
-                GUILayout.Label($"<b>{ProfilerI18n.Get("spike_frozen_banner")}</b>", headerStyle);
-                GUI.color = Color.white;
-                GUILayout.FlexibleSpace();
-                if (GUILayout.Button(ProfilerI18n.Get("spike_unfreeze"), GUILayout.Width(120)))
-                {
-                    ProfilerData.IsFrozen = false;
-                }
-                GUILayout.EndHorizontal();
-            }
 
             // Graph Canvas
             Rect graphRect = GUILayoutUtility.GetRect(960, 185);
@@ -736,40 +748,8 @@ namespace KSPPhysProfiler
                 }
             }
 
-            // Legend & Guidelines
-            GUILayout.BeginHorizontal();
-            GUILayout.Label($"<color=#33ff55>―</color> {ProfilerI18n.Get("graph_baseline_60")}", tipStyle);
-            GUILayout.Label($"<color=#ffaa22>―</color> {ProfilerI18n.Get("graph_baseline_30")}", tipStyle);
-            GUILayout.Label($"<color=#ff5555>―</color> {ProfilerI18n.Get("graph_baseline_20")}", tipStyle);
-            GUILayout.Space(15);
-            if (graphMode == 0)
-            {
-                GUILayout.Label($"<color=#00d2d3>■</color> {ProfilerI18n.Get("legend_modules")}", tipStyle);
-                GUILayout.Label($"<color=#a29bfe>■</color> {ProfilerI18n.Get("legend_plugins")}", tipStyle);
-                GUILayout.Label($"<color=#ff9f43>■</color> {ProfilerI18n.Get("legend_physx")}", tipStyle);
-                GUILayout.Label($"<color=#feca57>■</color> {ProfilerI18n.Get("legend_gpu")}", tipStyle);
-                GUILayout.Label($"<color=#8395a7>■</color> {ProfilerI18n.Get("legend_overhead")}", tipStyle);
-            }
-            else
-            {
-                GUILayout.Label($"<color=#33ff55>■</color> {ProfilerI18n.Get("graph_curve_fps")}", tipStyle);
-                GUILayout.Label($"<color=#ffaa22>■</color> {ProfilerI18n.Get("graph_curve_1pct")}", tipStyle);
-            }
-            GUILayout.FlexibleSpace();
-            GUILayout.Label(ProfilerI18n.Get("graph_spike_marker_tip"), tipStyle);
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(6);
-
-            // ==========================================
-            // Spike Sniffer (掉帧微卡顿精准抓拍) Card
-            // ==========================================
-            DrawSpikeSnifferCard();
-
-            GUILayout.Space(6);
-
             // Phase Breakdown Sub-card
-            GUILayout.Label($"<b>{ProfilerI18n.Get("graph_phase_metrics")}</b>", headerStyle);
+            GUILayout.Space(4);
             GUILayout.BeginHorizontal("box");
             GUILayout.Label($"<b>{ProfilerI18n.Get("metric_physx")}:</b> {ProfilerData.SmoothPhysicsStepMs:F2} ms", tipStyle, GUILayout.Width(190));
             GUILayout.Label($"<b>{ProfilerI18n.Get("metric_camera")}:</b> {ProfilerData.CameraRenderMs:F2} ms", tipStyle, GUILayout.Width(190));
@@ -782,7 +762,6 @@ namespace KSPPhysProfiler
             GUILayout.EndHorizontal();
 
             GUILayout.EndVertical();
-            GUILayout.EndScrollView();
         }
 
         private void DrawSpikeSnifferCard()
@@ -793,26 +772,29 @@ namespace KSPPhysProfiler
             GUILayout.Label($"<b>{ProfilerI18n.Get("spike_card_title")}</b>", headerStyle);
             GUILayout.FlexibleSpace();
 
-            // Auto Freeze toggle
-            string freezeBtn = ProfilerData.AutoFreezeOnSpike ? ProfilerI18n.Get("spike_auto_freeze_on") : ProfilerI18n.Get("spike_auto_freeze_off");
-            if (GUILayout.Button(freezeBtn, GUILayout.Width(160)))
+            // Prev/Next & Clear buttons
+            if (ProfilerData.SpikeHistory.Count > 1)
             {
-                ProfilerData.AutoFreezeOnSpike = !ProfilerData.AutoFreezeOnSpike;
-            }
-
-            // Unfreeze button if frozen
-            if (ProfilerData.IsFrozen)
-            {
-                GUI.color = new Color(1f, 0.85f, 0.3f, 1f);
-                if (GUILayout.Button(ProfilerI18n.Get("spike_unfreeze"), GUILayout.Width(100)))
+                if (GUILayout.Button(ProfilerI18n.Get("spike_prev"), GUILayout.Width(90), GUILayout.Height(22)))
                 {
-                    ProfilerData.IsFrozen = false;
+                    if (selectedSpikeIndex <= 0) selectedSpikeIndex = ProfilerData.SpikeHistory.Count - 1;
+                    else selectedSpikeIndex--;
                 }
-                GUI.color = Color.white;
+
+                int curIdx = (selectedSpikeIndex >= 0 && selectedSpikeIndex < ProfilerData.SpikeHistory.Count)
+                    ? selectedSpikeIndex + 1
+                    : ProfilerData.SpikeHistory.Count;
+                GUILayout.Label(string.Format(ProfilerI18n.Get("spike_history_count"), curIdx, ProfilerData.SpikeHistory.Count), tipStyle, GUILayout.Width(100));
+
+                if (GUILayout.Button(ProfilerI18n.Get("spike_next"), GUILayout.Width(90), GUILayout.Height(22)))
+                {
+                    if (selectedSpikeIndex >= ProfilerData.SpikeHistory.Count - 1) selectedSpikeIndex = 0;
+                    else selectedSpikeIndex++;
+                }
+                GUILayout.Space(8);
             }
 
-            // Clear button
-            if (ProfilerData.SpikeHistory.Count > 0 && GUILayout.Button(ProfilerI18n.Get("spike_clear"), GUILayout.Width(90)))
+            if (ProfilerData.SpikeHistory.Count > 0 && GUILayout.Button(ProfilerI18n.Get("spike_clear"), GUILayout.Width(85), GUILayout.Height(22)))
             {
                 ProfilerData.ClearSpikeHistory();
                 selectedSpikeIndex = -1;
@@ -910,11 +892,41 @@ namespace KSPPhysProfiler
 
         #endregion
 
-        #region Tab 1: Global Plugins Table
+        #region Tab 1: Mod Plugins & Scripts
 
-        private void DrawPluginsTab()
+        private void DrawScriptsTab()
         {
             GUILayout.BeginVertical(cardStyle);
+
+            // Sub-tab selector
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(ProfilerI18n.Get("subtab_plugins"), subTabScripts == 0 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(240), GUILayout.Height(24)))
+            {
+                subTabScripts = 0;
+            }
+            if (GUILayout.Button(ProfilerI18n.Get("subtab_modules"), subTabScripts == 1 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(240), GUILayout.Height(24)))
+            {
+                subTabScripts = 1;
+            }
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(4);
+
+            if (subTabScripts == 0)
+            {
+                DrawPluginsContent();
+            }
+            else
+            {
+                DrawModulesContent();
+            }
+
+            GUILayout.EndVertical();
+        }
+
+        private void DrawPluginsContent()
+        {
 
             if (ProfilerData.IsTUFXDetected)
             {
@@ -1060,16 +1072,10 @@ namespace KSPPhysProfiler
             }
 
             GUILayout.EndScrollView();
-            GUILayout.EndVertical();
         }
 
-        #endregion
-
-        #region Tab 2: PartModules Table
-
-        private void DrawModulesTab()
+        private void DrawModulesContent()
         {
-            GUILayout.BeginVertical(cardStyle);
 
             // Search Bar & Sort Lock
             GUILayout.BeginHorizontal();
@@ -1204,12 +1210,11 @@ namespace KSPPhysProfiler
             }
 
             GUILayout.EndScrollView();
-            GUILayout.EndVertical();
         }
 
         #endregion
 
-        #region Tab 3: Parts & Vessels Table
+        #region Tab 2: Parts & Vessels Table
 
         private void DrawPartsTab()
         {
@@ -1691,19 +1696,54 @@ namespace KSPPhysProfiler
 
         #endregion
 
-        #region Tab 5: Help & Guide Tab
+        #region Tab 4: Optimization Guide & Settings
 
-        private void DrawHelpTab()
+        private void DrawSettingsAndHelpTab()
         {
             GUILayout.BeginVertical(cardStyle);
             scrollPosHelp = GUILayout.BeginScrollView(scrollPosHelp);
 
-            GUILayout.Label($"<b>{ProfilerI18n.Get("help_h1")}</b>", headerStyle);
+            // Section 1: Quick Maintenance Actions Card
+            GUILayout.BeginVertical("box");
+            GUILayout.Label($"<b>⚙️ {ProfilerI18n.Get("tab_settings")}</b>", headerStyle);
+            GUILayout.Space(2);
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button($"📋 {ProfilerI18n.Get("export_dump")}", GUILayout.Width(170), GUILayout.Height(25)))
+            {
+                PhysProfilerPlugin.Instance.ExportReportToFile();
+            }
+            if (GUILayout.Button($"🔄 {ProfilerI18n.Get("reset_peak")}", GUILayout.Width(130), GUILayout.Height(25)))
+            {
+                ProfilerData.ResetAllPeakData();
+            }
+            if (GUILayout.Button($"🌐 {ProfilerI18n.GetCurrentLanguageButtonText()}", GUILayout.Width(160), GUILayout.Height(25)))
+            {
+                ProfilerI18n.ToggleNextLanguage();
+            }
+
+            GUILayout.FlexibleSpace();
+            GUILayout.Label(string.Format(ProfilerI18n.Get("patched_stats"), HarmonyPatches.PatchedModuleCount, HarmonyPatches.PatchedPluginCount), tipStyle);
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+
             GUILayout.Space(6);
+
+            // Section 2: Concrete Lag Countermeasures
+            GUILayout.BeginVertical("box");
+            GUILayout.Label($"<b>💡 {ProfilerI18n.Get("help_mod_tuning_q")}</b>", headerStyle);
+            GUILayout.Label(ProfilerI18n.Get("help_mod_tuning_a"), tipStyle);
+            GUILayout.EndVertical();
+
+            GUILayout.Space(6);
+
+            // Section 3: Performance Metrics Reference
+            GUILayout.Label($"<b>{ProfilerI18n.Get("help_h1")}</b>", headerStyle);
+            GUILayout.Space(2);
 
             // PTR Explanation
             GUILayout.BeginVertical("box");
-            GUILayout.Label($"<b>{ProfilerI18n.Get("help_ptr_q")}</b>", headerStyle);
+            GUILayout.Label($"<b>⏱️ {ProfilerI18n.Get("help_ptr_q")}</b>", headerStyle);
             GUILayout.Label(ProfilerI18n.Get("help_ptr_a"), tipStyle);
             GUILayout.EndVertical();
 
@@ -1711,7 +1751,7 @@ namespace KSPPhysProfiler
 
             // 1% Low Explanation
             GUILayout.BeginVertical("box");
-            GUILayout.Label($"<b>{ProfilerI18n.Get("help_1pct_q")}</b>", headerStyle);
+            GUILayout.Label($"<b>📊 {ProfilerI18n.Get("help_1pct_q")}</b>", headerStyle);
             GUILayout.Label(ProfilerI18n.Get("help_1pct_a"), tipStyle);
             GUILayout.EndVertical();
 
@@ -1719,16 +1759,8 @@ namespace KSPPhysProfiler
 
             // Jitter Explanation
             GUILayout.BeginVertical("box");
-            GUILayout.Label($"<b>{ProfilerI18n.Get("help_jitter_q")}</b>", headerStyle);
+            GUILayout.Label($"<b>〰️ {ProfilerI18n.Get("help_jitter_q")}</b>", headerStyle);
             GUILayout.Label(ProfilerI18n.Get("help_jitter_a"), tipStyle);
-            GUILayout.EndVertical();
-
-            GUILayout.Space(4);
-
-            // Mod Tuning Tips
-            GUILayout.BeginVertical("box");
-            GUILayout.Label($"<b>{ProfilerI18n.Get("help_mod_tuning_q")}</b>", headerStyle);
-            GUILayout.Label(ProfilerI18n.Get("help_mod_tuning_a"), tipStyle);
             GUILayout.EndVertical();
 
             GUILayout.EndScrollView();
