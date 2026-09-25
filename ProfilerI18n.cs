@@ -157,7 +157,43 @@ namespace KSPPhysProfiler
             { "msg_report_fail", "保存性能报告失败: {0}" },
             { "msg_ui_opened", "已打开性能分析器窗口" },
             { "msg_ui_closed", "已关闭性能分析器窗口" },
-            { "msg_hud_opened", "已切换至迷你监控 HUD" }
+            { "msg_hud_opened", "已切换至迷你监控 HUD" },
+
+            // Sort Lock & Anti-Flicker
+            { "sort_lock_on", "⏸️ 锁定排序" },
+            { "sort_lock_off", "🔄 动态排序" },
+            { "sort_refresh_now", "🔄 立即重新排序" },
+            { "sort_lock_tip", "锁定当前表格行顺序，防止高频跳动闪烁，仅就地刷新数值" },
+
+            // Spike Sniffer
+            { "spike_card_title", "⚡ 掉帧微卡顿精准抓拍 (Spike Sniffer)" },
+            { "spike_none", "暂未捕获到异常掉帧尖峰 (系统平稳流畅)" },
+            { "spike_history_count", "历史抓拍 ({0}/{1})" },
+            { "spike_time", "抓拍时间: {0}" },
+            { "spike_duration", "慢帧耗时: <color=#ff5555><b>{0:F1} ms</b></color> (基准均值: {1:F1} ms，突增 <color=yellow><b>{2:F1}x</b></color>)" },
+            { "spike_gc_flag", "Mono GC 垃圾回收" },
+            { "spike_gc_detected", "<color=#ff5555>⚠️ 检测到 GC 停顿触发！(增量 {0} 次垃圾回收)</color>" },
+            { "spike_gc_none", "无 GC 垃圾回收触发" },
+            { "spike_culprit_header", "慢帧致卡根源定位 (Top Offenders in Slow Frame):" },
+            { "spike_auto_freeze_on", "🔒 抓拍自动冻结: 开" },
+            { "spike_auto_freeze_off", "🔓 抓拍自动冻结: 关" },
+            { "spike_prev", "◀ 上一处尖峰" },
+            { "spike_next", "下一处尖峰 ▶" },
+            { "spike_clear", "🗑️ 清空抓拍" },
+            { "spike_unfreeze", "▶ 解除冻结" },
+            { "spike_frozen_banner", "⏸️ 性能分析器已冻结！点击'解除冻结'继续实时监测" },
+
+            // Detailed Charting
+            { "graph_mode_stacked", "📊 多层宏观堆叠图" },
+            { "graph_mode_curve", "📈 帧率双曲线 (FPS & 1% Low)" },
+            { "graph_scale_label", "时间跨度:" },
+            { "graph_frames_100", "100 帧 (~1.5s)" },
+            { "graph_frames_300", "300 帧 (~5s)" },
+            { "graph_frames_600", "600 帧 (~10s)" },
+            { "graph_baseline_20", "20 FPS 警戒线 (50.0ms)" },
+            { "graph_curve_fps", "实时 FPS" },
+            { "graph_curve_1pct", "1% Low FPS" },
+            { "graph_spike_marker_tip", "红点 ▼ 标记帧时间骤升尖峰，点击即可定位分析" }
         };
 
         private static readonly Dictionary<string, string> enDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -302,7 +338,43 @@ namespace KSPPhysProfiler
             { "msg_report_fail", "Failed to save performance report: {0}" },
             { "msg_ui_opened", "Performance Profiler window opened" },
             { "msg_ui_closed", "Performance Profiler window closed" },
-            { "msg_hud_opened", "Switched to Mini Profiler HUD" }
+            { "msg_hud_opened", "Switched to Mini Profiler HUD" },
+
+            // Sort Lock & Anti-Flicker
+            { "sort_lock_on", "⏸️ Lock Sort" },
+            { "sort_lock_off", "🔄 Dynamic Sort" },
+            { "sort_refresh_now", "🔄 Re-sort Now" },
+            { "sort_lock_tip", "Freeze row order to prevent jitter; values update smoothly in-place" },
+
+            // Spike Sniffer
+            { "spike_card_title", "⚡ Stutter Spike Sniffer (Instant Root Cause)" },
+            { "spike_none", "No freeze spikes detected yet (Smooth operation)" },
+            { "spike_history_count", "Spike Log ({0}/{1})" },
+            { "spike_time", "Captured: {0}" },
+            { "spike_duration", "Spike Frame: <color=#ff5555><b>{0:F1} ms</b></color> (Baseline: {1:F1} ms, <color=yellow><b>{2:F1}x</b></color> slower)" },
+            { "spike_gc_flag", "Mono GC Collection" },
+            { "spike_gc_detected", "<color=#ff5555>⚠️ GC Pause triggered! ({0} collections occurred)</color>" },
+            { "spike_gc_none", "No GC collections in this frame" },
+            { "spike_culprit_header", "Root Cause Culprits in Slow Frame:" },
+            { "spike_auto_freeze_on", "🔒 Auto-Freeze on Spike: ON" },
+            { "spike_auto_freeze_off", "🔓 Auto-Freeze on Spike: OFF" },
+            { "spike_prev", "◀ Prev Spike" },
+            { "spike_next", "Next Spike ▶" },
+            { "spike_clear", "🗑️ Clear Log" },
+            { "spike_unfreeze", "▶ Unfreeze" },
+            { "spike_frozen_banner", "⏸️ Profiler is Frozen! Click 'Unfreeze' to resume real-time metrics" },
+
+            // Detailed Charting
+            { "graph_mode_stacked", "📊 Stacked Budget Timeline" },
+            { "graph_mode_curve", "📈 Framerate & 1% Low Curve" },
+            { "graph_scale_label", "Time Window:" },
+            { "graph_frames_100", "100 Frames (~1.5s)" },
+            { "graph_frames_300", "300 Frames (~5s)" },
+            { "graph_frames_600", "600 Frames (~10s)" },
+            { "graph_baseline_20", "20 FPS Danger Line (50.0ms)" },
+            { "graph_curve_fps", "Realtime FPS" },
+            { "graph_curve_1pct", "1% Low FPS" },
+            { "graph_spike_marker_tip", "Red ▼ markers indicate freeze spikes. Click to inspect culprit details." }
         };
 
         public static bool IsChinese

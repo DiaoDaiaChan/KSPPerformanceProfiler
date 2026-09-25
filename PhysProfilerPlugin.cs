@@ -175,7 +175,7 @@ namespace KSPPhysProfiler
                 appButton = null;
             }
 
-            Texture2D icon = CreateDefaultIcon();
+            Texture2D icon = LoadPluginIcon();
             appButton = ApplicationLauncher.Instance.AddModApplication(
                 OnAppLauncherTrue,
                 OnAppLauncherFalse,
@@ -199,6 +199,30 @@ namespace KSPPhysProfiler
                 ApplicationLauncher.Instance.RemoveModApplication(appButton);
                 appButton = null;
             }
+        }
+
+        private Texture2D LoadPluginIcon()
+        {
+            try
+            {
+                string iconPath = Path.Combine(KSPUtil.ApplicationRootPath, "GameData", "KSPPhysProfiler", "Icons", "icon.png");
+                if (File.Exists(iconPath))
+                {
+                    byte[] data = File.ReadAllBytes(iconPath);
+                    Texture2D tex = new Texture2D(38, 38, TextureFormat.RGBA32, false);
+                    if (tex.LoadImage(data))
+                    {
+                        tex.wrapMode = TextureWrapMode.Clamp;
+                        return tex;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[KSPPhysProfiler] Failed to load icon from disk: {ex.Message}. Falling back to procedural icon.");
+            }
+
+            return CreateDefaultIcon();
         }
 
         private Texture2D CreateDefaultIcon()

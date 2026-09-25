@@ -13,11 +13,20 @@ namespace KSPPhysProfiler
         private Rect miniWindowRect;
         private int selectedTab = 0;
 
+        private Vector2 scrollPosGraph = Vector2.zero;
         private Vector2 scrollPosPlugins = Vector2.zero;
         private Vector2 scrollPosModules = Vector2.zero;
         private Vector2 scrollPosParts = Vector2.zero;
         private Vector2 scrollPosHelp = Vector2.zero;
         private Vector2 scrollPosAssembly = Vector2.zero;
+
+        // Sort lock & Anti-Flicker state
+        private bool isSortLocked = false;
+
+        // Graph options
+        private int graphMode = 0; // 0: Multi-layer Stacked Area, 1: FPS Curve
+        private int graphTimeRange = 100; // 100, 300, 600 frames
+        private int selectedSpikeIndex = -1;
 
         // Search Filters
         private string searchPlugins = "";
@@ -339,6 +348,13 @@ namespace KSPPhysProfiler
                 IsMiniHud = true;
             }
 
+            // Sort Lock & Anti-Flicker Toggle
+            string sortLockText = isSortLocked ? ProfilerI18n.Get("sort_lock_on") : ProfilerI18n.Get("sort_lock_off");
+            if (GUILayout.Button(sortLockText, GUILayout.Width(110)))
+            {
+                isSortLocked = !isSortLocked;
+            }
+
             GUILayout.FlexibleSpace();
 
             // Patched counters info
@@ -461,71 +477,288 @@ namespace KSPPhysProfiler
             currentX += width;
         }
 
+        private void DrawMicroBar(double ms, double maxMs = 20.0, float width = 45f, float height = 8f)
+        {
+            Rect r = GUILayoutUtility.GetRect(width, height, GUILayout.Width(width), GUILayout.Height(height));
+            r.y += 3f;
+
+            // Background track
+            GUI.color = new Color(0.18f, 0.22f, 0.28f, 0.7f);
+            GUI.DrawTexture(r, whitePixelTex);
+
+            // Fill
+            float fillPct = Mathf.Clamp01((float)(ms / Math.Max(0.001, maxMs)));
+            float fillW = r.width * fillPct;
+            if (fillW > 0.5f)
+            {
+                Color fillCol = ms > 4.0 ? new Color(1f, 0.3f, 0.3f, 0.95f) :
+                               (ms > 1.2 ? new Color(1f, 0.75f, 0.2f, 0.95f) :
+                               new Color(0.2f, 0.85f, 0.5f, 0.9f));
+                GUI.color = fillCol;
+                GUI.DrawTexture(new Rect(r.x, r.y, fillW, r.height), whitePixelTex);
+            }
+            GUI.color = Color.white;
+        }
+
         #endregion
 
         #region Tab 0: FPS & Frame Time Graph
 
         private void DrawFpsGraphTab()
         {
+            scrollPosGraph = GUILayout.BeginScrollView(scrollPosGraph);
             GUILayout.BeginVertical(cardStyle);
-            GUILayout.Label($"<b>{ProfilerI18n.Get("graph_title")}</b>", headerStyle);
 
-            Rect graphRect = GUILayoutUtility.GetRect(960, 180);
+            // Controls Toolbar
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"<b>{ProfilerI18n.Get("graph_title")}</b>", headerStyle);
+            GUILayout.FlexibleSpace();
+
+            // Mode switch
+            if (GUILayout.Button(ProfilerI18n.Get("graph_mode_stacked"), graphMode == 0 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(150)))
+            {
+                graphMode = 0;
+            }
+            if (GUILayout.Button(ProfilerI18n.Get("graph_mode_curve"), graphMode == 1 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(170)))
+            {
+                graphMode = 1;
+            }
+
+            GUILayout.Space(8);
+            GUILayout.Label(ProfilerI18n.Get("graph_scale_label"), tipStyle);
+
+            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_100"), graphTimeRange == 100 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(95)))
+            {
+                graphTimeRange = 100;
+            }
+            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_300"), graphTimeRange == 300 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(95)))
+            {
+                graphTimeRange = 300;
+            }
+            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_600"), graphTimeRange == 600 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(95)))
+            {
+                graphTimeRange = 600;
+            }
+
+            GUILayout.EndHorizontal();
+
+            // Frozen notification banner if frozen
+            if (ProfilerData.IsFrozen)
+            {
+                GUILayout.BeginHorizontal("box");
+                GUI.color = new Color(1f, 0.85f, 0.3f, 1f);
+                GUILayout.Label($"<b>{ProfilerI18n.Get("spike_frozen_banner")}</b>", headerStyle);
+                GUI.color = Color.white;
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button(ProfilerI18n.Get("spike_unfreeze"), GUILayout.Width(120)))
+                {
+                    ProfilerData.IsFrozen = false;
+                }
+                GUILayout.EndHorizontal();
+            }
+
+            // Graph Canvas
+            Rect graphRect = GUILayoutUtility.GetRect(960, 185);
             GUI.Box(graphRect, "");
 
-            double[] history = ProfilerData.GetFrameHistorySample(100);
+            var timeline = ProfilerData.GetTimelineSample(graphTimeRange);
 
-            if (history != null && history.Length > 1)
+            if (timeline != null && timeline.Count > 1)
             {
-                float maxMs = 80f; // Scale graph up to 80ms
-                float innerW = graphRect.width - 20;
-                float innerH = graphRect.height - 20;
-                float innerX = graphRect.x + 10;
-                float innerY = graphRect.y + 10;
+                float innerW = graphRect.width - 24;
+                float innerH = graphRect.height - 24;
+                float innerX = graphRect.x + 12;
+                float innerY = graphRect.y + 12;
 
-                // Draw Reference Guidelines (60 FPS = 16.6ms, 30 FPS = 33.3ms)
-                float y60 = innerY + innerH - ((16.67f / maxMs) * innerH);
-                float y30 = innerY + innerH - ((33.33f / maxMs) * innerH);
+                Event currentEvt = Event.current;
 
-                // 60 FPS Target Line (Green)
-                GUI.color = new Color(0.2f, 0.9f, 0.3f, 0.35f);
-                GUI.DrawTexture(new Rect(innerX, y60, innerW, 1.5f), whitePixelTex);
-
-                // 30 FPS Target Line (Orange)
-                GUI.color = new Color(1f, 0.6f, 0.1f, 0.35f);
-                GUI.DrawTexture(new Rect(innerX, y30, innerW, 1.5f), whitePixelTex);
-
-                // Bars
-                int spikeCount = 0;
-                for (int i = 0; i < history.Length; i++)
+                if (graphMode == 0)
                 {
-                    float ms = (float)history[i];
-                    if (ms > 50f) spikeCount++;
+                    // === Mode 0: Multi-layer Stacked Area Graph ===
+                    double peakMs = 45.0;
+                    for (int i = 0; i < timeline.Count; i++)
+                    {
+                        if (timeline.TotalMs[i] > peakMs) peakMs = timeline.TotalMs[i];
+                    }
+                    float maxMs = Mathf.Clamp((float)peakMs * 1.15f, 40f, 160f);
 
-                    float barHeight = Mathf.Clamp((ms / maxMs) * innerH, 2f, innerH);
-                    float barWidth = innerW / history.Length;
-                    float xPos = innerX + (i * barWidth);
-                    float yPos = innerY + innerH - barHeight;
+                    // Guidelines
+                    float y60 = innerY + innerH - ((16.67f / maxMs) * innerH);
+                    float y30 = innerY + innerH - ((33.33f / maxMs) * innerH);
+                    float y20 = innerY + innerH - ((50.0f / maxMs) * innerH);
 
-                    Color barColor = ms > 50f ? new Color(1f, 0.25f, 0.25f, 0.95f) :
-                                     (ms > 33.3f ? new Color(1f, 0.75f, 0.15f, 0.95f) :
-                                     new Color(0.2f, 0.9f, 0.35f, 0.85f));
+                    // 60 FPS (Green)
+                    GUI.color = new Color(0.2f, 0.9f, 0.35f, 0.35f);
+                    GUI.DrawTexture(new Rect(innerX, y60, innerW, 1.5f), whitePixelTex);
 
-                    GUI.color = barColor;
-                    GUI.DrawTexture(new Rect(xPos, yPos, Math.Max(1.5f, barWidth - 1f), barHeight), whitePixelTex);
+                    // 30 FPS (Orange)
+                    GUI.color = new Color(1f, 0.65f, 0.2f, 0.35f);
+                    GUI.DrawTexture(new Rect(innerX, y30, innerW, 1.5f), whitePixelTex);
+
+                    // 20 FPS (Red)
+                    if (y20 >= innerY)
+                    {
+                        GUI.color = new Color(1f, 0.3f, 0.3f, 0.35f);
+                        GUI.DrawTexture(new Rect(innerX, y20, innerW, 1.5f), whitePixelTex);
+                    }
+
+                    // Stack colors
+                    Color colMod = new Color(0f, 0.82f, 0.83f, 0.95f);       // Cyan
+                    Color colPlugin = new Color(0.63f, 0.61f, 0.99f, 0.95f);  // Violet
+                    Color colPhysx = new Color(1f, 0.62f, 0.26f, 0.95f);     // Orange
+                    Color colGpu = new Color(1f, 0.8f, 0.34f, 0.95f);        // Gold
+                    Color colOverhead = new Color(0.51f, 0.58f, 0.65f, 0.85f); // Slate
+
+                    float barWidth = innerW / timeline.Count;
+
+                    for (int i = 0; i < timeline.Count; i++)
+                    {
+                        float xPos = innerX + (i * barWidth);
+                        float currentY = innerY + innerH;
+                        float w = Math.Max(1.0f, barWidth - (timeline.Count > 200 ? 0f : 0.5f));
+
+                        // 1. PartModules
+                        float hMod = Mathf.Clamp((float)(timeline.ModulesMs[i] / maxMs) * innerH, 0f, innerH);
+                        currentY -= hMod;
+                        if (hMod > 0.5f)
+                        {
+                            GUI.color = colMod;
+                            GUI.DrawTexture(new Rect(xPos, currentY, w, hMod), whitePixelTex);
+                        }
+
+                        // 2. Plugins
+                        float hPlugin = Mathf.Clamp((float)(timeline.PluginsMs[i] / maxMs) * innerH, 0f, innerH);
+                        currentY -= hPlugin;
+                        if (hPlugin > 0.5f)
+                        {
+                            GUI.color = colPlugin;
+                            GUI.DrawTexture(new Rect(xPos, currentY, w, hPlugin), whitePixelTex);
+                        }
+
+                        // 3. PhysX
+                        float hPhysx = Mathf.Clamp((float)(timeline.PhysXMs[i] / maxMs) * innerH, 0f, innerH);
+                        currentY -= hPhysx;
+                        if (hPhysx > 0.5f)
+                        {
+                            GUI.color = colPhysx;
+                            GUI.DrawTexture(new Rect(xPos, currentY, w, hPhysx), whitePixelTex);
+                        }
+
+                        // 4. GPU / Render
+                        float hGpu = Mathf.Clamp((float)(timeline.GpuMs[i] / maxMs) * innerH, 0f, innerH);
+                        currentY -= hGpu;
+                        if (hGpu > 0.5f)
+                        {
+                            GUI.color = colGpu;
+                            GUI.DrawTexture(new Rect(xPos, currentY, w, hGpu), whitePixelTex);
+                        }
+
+                        // 5. Overhead
+                        float hOverhead = Mathf.Clamp((float)(timeline.OverheadMs[i] / maxMs) * innerH, 0f, innerH);
+                        currentY -= hOverhead;
+                        if (hOverhead > 0.5f)
+                        {
+                            GUI.color = colOverhead;
+                            GUI.DrawTexture(new Rect(xPos, currentY, w, hOverhead), whitePixelTex);
+                        }
+
+                        // Spike Marker ▼
+                        if (timeline.IsSpike[i])
+                        {
+                            GUI.color = new Color(1f, 0.2f, 0.2f, 1f);
+                            Rect markerRect = new Rect(xPos - 3, innerY - 2, 12, 14);
+                            GUI.Label(markerRect, "▼", headerStyle);
+
+                            // Click on column to inspect this spike
+                            if (currentEvt.type == EventType.MouseDown && new Rect(xPos - 2, innerY, barWidth + 4, innerH).Contains(currentEvt.mousePosition))
+                            {
+                                int sId = timeline.SpikeId[i];
+                                int foundIdx = ProfilerData.SpikeHistory.FindIndex(s => s.SpikeId == sId);
+                                if (foundIdx >= 0) selectedSpikeIndex = foundIdx;
+                                currentEvt.Use();
+                            }
+                        }
+                    }
+                    GUI.color = Color.white;
                 }
-                GUI.color = Color.white;
+                else
+                {
+                    // === Mode 1: FPS & 1% Low Curve Mode ===
+                    float maxFps = 120f;
+                    float y60 = innerY + innerH - ((60f / maxFps) * innerH);
+                    float y30 = innerY + innerH - ((30f / maxFps) * innerH);
+
+                    // 60 FPS Target (Green)
+                    GUI.color = new Color(0.2f, 0.9f, 0.35f, 0.35f);
+                    GUI.DrawTexture(new Rect(innerX, y60, innerW, 1.5f), whitePixelTex);
+
+                    // 30 FPS Minimum (Orange)
+                    GUI.color = new Color(1f, 0.65f, 0.2f, 0.35f);
+                    GUI.DrawTexture(new Rect(innerX, y30, innerW, 1.5f), whitePixelTex);
+
+                    float barWidth = innerW / timeline.Count;
+
+                    for (int i = 0; i < timeline.Count; i++)
+                    {
+                        float xPos = innerX + (i * barWidth);
+                        float w = Math.Max(1.0f, barWidth - (timeline.Count > 200 ? 0f : 0.5f));
+
+                        // 1% Low indicator (Dark amber base)
+                        float hLow = Mathf.Clamp((float)(timeline.OnePctLow[i] / maxFps) * innerH, 1f, innerH);
+                        float yLow = innerY + innerH - hLow;
+                        GUI.color = new Color(1f, 0.65f, 0.15f, 0.6f);
+                        GUI.DrawTexture(new Rect(xPos, yLow, w, hLow), whitePixelTex);
+
+                        // FPS bar (Green/Cyan)
+                        float hFps = Mathf.Clamp((float)(timeline.Fps[i] / maxFps) * innerH, 1f, innerH);
+                        float yFps = innerY + innerH - hFps;
+                        Color fpsCol = timeline.Fps[i] >= 55f ? new Color(0.2f, 0.9f, 0.35f, 0.9f) :
+                                      (timeline.Fps[i] >= 28f ? new Color(1f, 0.8f, 0.2f, 0.9f) :
+                                      new Color(1f, 0.3f, 0.3f, 0.95f));
+                        GUI.color = fpsCol;
+                        GUI.DrawTexture(new Rect(xPos, yFps, w, 2.5f), whitePixelTex);
+
+                        // Spike indicator
+                        if (timeline.IsSpike[i])
+                        {
+                            GUI.color = new Color(1f, 0.2f, 0.2f, 1f);
+                            Rect markerRect = new Rect(xPos - 3, innerY - 2, 12, 14);
+                            GUI.Label(markerRect, "▼", headerStyle);
+                        }
+                    }
+                    GUI.color = Color.white;
+                }
             }
 
             // Legend & Guidelines
             GUILayout.BeginHorizontal();
             GUILayout.Label($"<color=#33ff55>―</color> {ProfilerI18n.Get("graph_baseline_60")}", tipStyle);
             GUILayout.Label($"<color=#ffaa22>―</color> {ProfilerI18n.Get("graph_baseline_30")}", tipStyle);
-            GUILayout.Space(20);
-            GUILayout.Label(ProfilerI18n.Get("graph_legend_green"), tipStyle);
-            GUILayout.Label(ProfilerI18n.Get("graph_legend_yellow"), tipStyle);
-            GUILayout.Label(ProfilerI18n.Get("graph_legend_red"), tipStyle);
+            GUILayout.Label($"<color=#ff5555>―</color> {ProfilerI18n.Get("graph_baseline_20")}", tipStyle);
+            GUILayout.Space(15);
+            if (graphMode == 0)
+            {
+                GUILayout.Label($"<color=#00d2d3>■</color> {ProfilerI18n.Get("legend_modules")}", tipStyle);
+                GUILayout.Label($"<color=#a29bfe>■</color> {ProfilerI18n.Get("legend_plugins")}", tipStyle);
+                GUILayout.Label($"<color=#ff9f43>■</color> {ProfilerI18n.Get("legend_physx")}", tipStyle);
+                GUILayout.Label($"<color=#feca57>■</color> {ProfilerI18n.Get("legend_gpu")}", tipStyle);
+                GUILayout.Label($"<color=#8395a7>■</color> {ProfilerI18n.Get("legend_overhead")}", tipStyle);
+            }
+            else
+            {
+                GUILayout.Label($"<color=#33ff55>■</color> {ProfilerI18n.Get("graph_curve_fps")}", tipStyle);
+                GUILayout.Label($"<color=#ffaa22>■</color> {ProfilerI18n.Get("graph_curve_1pct")}", tipStyle);
+            }
+            GUILayout.FlexibleSpace();
+            GUILayout.Label(ProfilerI18n.Get("graph_spike_marker_tip"), tipStyle);
             GUILayout.EndHorizontal();
+
+            GUILayout.Space(6);
+
+            // ==========================================
+            // Spike Sniffer (掉帧微卡顿精准抓拍) Card
+            // ==========================================
+            DrawSpikeSnifferCard();
 
             GUILayout.Space(6);
 
@@ -541,6 +774,130 @@ namespace KSPPhysProfiler
                 GUILayout.Label($"<b><color=#00e5ff>TUFX:</color></b> {ProfilerData.TUFXPostProcessMs:F2} ms", tipStyle, GUILayout.Width(180));
             }
             GUILayout.EndHorizontal();
+
+            GUILayout.EndVertical();
+            GUILayout.EndScrollView();
+        }
+
+        private void DrawSpikeSnifferCard()
+        {
+            GUILayout.BeginVertical(cardAccentStyle);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"<b>{ProfilerI18n.Get("spike_card_title")}</b>", headerStyle);
+            GUILayout.FlexibleSpace();
+
+            // Auto Freeze toggle
+            string freezeBtn = ProfilerData.AutoFreezeOnSpike ? ProfilerI18n.Get("spike_auto_freeze_on") : ProfilerI18n.Get("spike_auto_freeze_off");
+            if (GUILayout.Button(freezeBtn, GUILayout.Width(160)))
+            {
+                ProfilerData.AutoFreezeOnSpike = !ProfilerData.AutoFreezeOnSpike;
+            }
+
+            // Unfreeze button if frozen
+            if (ProfilerData.IsFrozen)
+            {
+                GUI.color = new Color(1f, 0.85f, 0.3f, 1f);
+                if (GUILayout.Button(ProfilerI18n.Get("spike_unfreeze"), GUILayout.Width(100)))
+                {
+                    ProfilerData.IsFrozen = false;
+                }
+                GUI.color = Color.white;
+            }
+
+            // Clear button
+            if (ProfilerData.SpikeHistory.Count > 0 && GUILayout.Button(ProfilerI18n.Get("spike_clear"), GUILayout.Width(90)))
+            {
+                ProfilerData.ClearSpikeHistory();
+                selectedSpikeIndex = -1;
+            }
+
+            GUILayout.EndHorizontal();
+
+            // Fetch active spike
+            SpikeSnapshot spike = null;
+            if (selectedSpikeIndex >= 0 && selectedSpikeIndex < ProfilerData.SpikeHistory.Count)
+            {
+                spike = ProfilerData.SpikeHistory[selectedSpikeIndex];
+            }
+            else if (ProfilerData.LatestSpike != null)
+            {
+                spike = ProfilerData.LatestSpike;
+            }
+
+            if (spike == null)
+            {
+                GUILayout.Label($"<color=#33FF55>🟢 {ProfilerI18n.Get("spike_none")}</color>", tipStyle);
+            }
+            else
+            {
+                // Navigation and status bar
+                GUILayout.BeginHorizontal();
+
+                // Prev/Next buttons
+                if (ProfilerData.SpikeHistory.Count > 1)
+                {
+                    if (GUILayout.Button(ProfilerI18n.Get("spike_prev"), GUILayout.Width(90)))
+                    {
+                        if (selectedSpikeIndex <= 0) selectedSpikeIndex = ProfilerData.SpikeHistory.Count - 1;
+                        else selectedSpikeIndex--;
+                    }
+
+                    int curIdx = (selectedSpikeIndex >= 0 && selectedSpikeIndex < ProfilerData.SpikeHistory.Count)
+                        ? selectedSpikeIndex + 1
+                        : ProfilerData.SpikeHistory.Count;
+                    GUILayout.Label(string.Format(ProfilerI18n.Get("spike_history_count"), curIdx, ProfilerData.SpikeHistory.Count), tipStyle, GUILayout.Width(110));
+
+                    if (GUILayout.Button(ProfilerI18n.Get("spike_next"), GUILayout.Width(90)))
+                    {
+                        if (selectedSpikeIndex >= ProfilerData.SpikeHistory.Count - 1) selectedSpikeIndex = 0;
+                        else selectedSpikeIndex++;
+                    }
+                    GUILayout.Space(10);
+                }
+
+                GUILayout.Label(string.Format(ProfilerI18n.Get("spike_time"), spike.Timestamp.ToString("HH:mm:ss")), tipStyle, GUILayout.Width(130));
+                GUILayout.Label(string.Format(ProfilerI18n.Get("spike_duration"), spike.FrameMs, spike.NormalAvgMs, spike.SpikeRatio), tipStyle);
+
+                GUILayout.FlexibleSpace();
+
+                // GC pause badge
+                if (spike.IsGcPause)
+                {
+                    GUILayout.Label(string.Format(ProfilerI18n.Get("spike_gc_detected"), spike.GcCollections), headerStyle);
+                }
+                else
+                {
+                    GUILayout.Label($"<color=#888888>{ProfilerI18n.Get("spike_gc_none")}</color>", tipStyle);
+                }
+
+                GUILayout.EndHorizontal();
+
+                // Culprits table
+                if (spike.Culprits != null && spike.Culprits.Count > 0)
+                {
+                    GUILayout.Space(2);
+                    GUILayout.Label($"<b>{ProfilerI18n.Get("spike_culprit_header")}</b>", tipStyle);
+
+                    for (int i = 0; i < spike.Culprits.Count; i++)
+                    {
+                        var c = spike.Culprits[i];
+                        string catColor = c.Category == "PartModule" ? "#00d2d3" :
+                                         (c.Category == "Plugin" ? "#a29bfe" :
+                                         (c.Category == "PhysX" ? "#ff9f43" :
+                                         (c.Category == "Mono GC" ? "#ff5555" : "#feca57")));
+
+                        string methText = !string.IsNullOrEmpty(c.TopMethod) ? $" -> <color=#88bbdd>{c.TopMethod}</color>" : "";
+
+                        GUILayout.BeginHorizontal("box");
+                        GUILayout.Label($"<b>#{i + 1}</b> <color={catColor}>[{c.Category}]</color> <b>{c.Name}</b>{methText}", tipStyle, GUILayout.Width(520));
+                        GUILayout.Label($"<color=#ff5555><b>{c.FrameMs:F1} ms</b></color> ({c.PctOfFrame:F1}%)", tipStyle, GUILayout.Width(130));
+                        DrawMicroBar(c.FrameMs, spike.FrameMs, 100f, 10f);
+                        GUILayout.FlexibleSpace();
+                        GUILayout.EndHorizontal();
+                    }
+                }
+            }
 
             GUILayout.EndVertical();
         }
@@ -561,13 +918,24 @@ namespace KSPPhysProfiler
                 GUILayout.Space(2);
             }
 
-            // Search Bar
+            // Search Bar & Sort Lock
             GUILayout.BeginHorizontal();
             GUILayout.Label(ProfilerI18n.Get("search_placeholder"), GUILayout.Width(150));
-            searchPlugins = GUILayout.TextField(searchPlugins, GUILayout.Width(260));
+            searchPlugins = GUILayout.TextField(searchPlugins, GUILayout.Width(240));
             if (!string.IsNullOrEmpty(searchPlugins) && GUILayout.Button(ProfilerI18n.Get("clear_search"), GUILayout.Width(60)))
             {
                 searchPlugins = "";
+            }
+            GUILayout.Space(8);
+            string sortLockText = isSortLocked ? ProfilerI18n.Get("sort_lock_on") : ProfilerI18n.Get("sort_lock_off");
+            if (GUILayout.Button(sortLockText, GUILayout.Width(110)))
+            {
+                isSortLocked = !isSortLocked;
+            }
+            if (isSortLocked && GUILayout.Button(ProfilerI18n.Get("sort_refresh_now"), GUILayout.Width(100)))
+            {
+                cachedTopPlugins = ProfilerData.GetTopPlugins(60, searchPlugins, sortPluginsCol, sortPluginsAsc);
+                lastTableUpdateTime = Time.realtimeSinceStartup;
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -605,13 +973,13 @@ namespace KSPPhysProfiler
             scrollPosPlugins = GUILayout.BeginScrollView(scrollPosPlugins);
 
             float now = Time.realtimeSinceStartup;
-            bool forceRefresh = cachedTopPlugins.Count == 0 ||
-                                now - lastTableUpdateTime >= UI_THROTTLE_INTERVAL ||
-                                searchPlugins != lastSearchPlugins ||
-                                sortPluginsCol != lastSortPluginsCol ||
-                                sortPluginsAsc != lastSortPluginsAsc;
+            bool sortChanged = searchPlugins != lastSearchPlugins ||
+                               sortPluginsCol != lastSortPluginsCol ||
+                               sortPluginsAsc != lastSortPluginsAsc;
 
-            if (forceRefresh)
+            bool shouldReorder = cachedTopPlugins.Count == 0 || sortChanged || (!isSortLocked && (now - lastTableUpdateTime >= 1.5f));
+
+            if (shouldReorder)
             {
                 cachedTopPlugins = ProfilerData.GetTopPlugins(60, searchPlugins, sortPluginsCol, sortPluginsAsc);
                 lastSearchPlugins = searchPlugins;
@@ -626,8 +994,8 @@ namespace KSPPhysProfiler
             for (int i = 0; i < topPlugins.Count; i++)
             {
                 ModuleStats p = topPlugins[i];
-                double pct = (p.SmoothMs / totalFrameMs) * 100.0;
-                string colorStr = p.SmoothMs > 4.0 ? "#FF4444" : (p.SmoothMs > 1.2 ? "#FFAA22" : "#FFFFFF");
+                double pct = (p.DisplayMs / totalFrameMs) * 100.0;
+                string colorStr = p.DisplayMs > 4.0 ? "#FF4444" : (p.DisplayMs > 1.2 ? "#FFAA22" : "#FFFFFF");
                 string displayTitle = p.IsTUFX
                     ? $"<color=#00e5ff>[TUFX]</color> <color={colorStr}>{p.FriendlyName}</color>"
                     : $"<color={colorStr}>{p.TypeName}</color>";
@@ -645,8 +1013,14 @@ namespace KSPPhysProfiler
                         else expandedTypes.Add(typeKey);
                     }
                 }
-                GUILayout.Label($"{p.SmoothMs:F3} ms", GUILayout.Width(110));
-                GUILayout.Label($"{p.PeakMs:F2} ms", GUILayout.Width(100));
+
+                // Avg Ms + Micro Bar
+                GUILayout.BeginHorizontal(GUILayout.Width(110));
+                GUILayout.Label($"{p.DisplayMs:F2} ms", GUILayout.Width(62));
+                DrawMicroBar(p.DisplayMs, totalFrameMs, 40f);
+                GUILayout.EndHorizontal();
+
+                GUILayout.Label($"{p.DisplayPeakMs:F2} ms", GUILayout.Width(100));
                 GUILayout.Label($"{p.CurrentFrameCalls}", GUILayout.Width(100));
                 GUILayout.Label($"{pct:F1}%", GUILayout.Width(110));
                 GUILayout.Label($"{p.AssemblyName}", GUILayout.Width(170));
@@ -657,12 +1031,17 @@ namespace KSPPhysProfiler
                     foreach (var meth in p.GetSortedMethods())
                     {
                         if (meth.SmoothMs < 0.0005 && meth.CurrentFrameCalls == 0) continue;
-                        string mColor = meth.SmoothMs > 2.0 ? "#FF5555" : (meth.SmoothMs > 0.5 ? "#FFBB33" : "#88BBDD");
+                        string mColor = meth.DisplayMs > 2.0 ? "#FF5555" : (meth.DisplayMs > 0.5 ? "#FFBB33" : "#88BBDD");
                         GUILayout.BeginHorizontal();
                         GUILayout.Space(24);
                         GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.Width(326));
-                        GUILayout.Label($"{meth.SmoothMs:F3} ms", GUILayout.Width(110));
-                        GUILayout.Label($"{meth.PeakMs:F2} ms", GUILayout.Width(100));
+
+                        GUILayout.BeginHorizontal(GUILayout.Width(110));
+                        GUILayout.Label($"{meth.DisplayMs:F2} ms", GUILayout.Width(62));
+                        DrawMicroBar(meth.DisplayMs, totalFrameMs, 40f);
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", GUILayout.Width(100));
                         GUILayout.Label($"{meth.CurrentFrameCalls}", GUILayout.Width(100));
                         GUILayout.EndHorizontal();
                     }
@@ -686,13 +1065,24 @@ namespace KSPPhysProfiler
         {
             GUILayout.BeginVertical(cardStyle);
 
-            // Search Bar
+            // Search Bar & Sort Lock
             GUILayout.BeginHorizontal();
             GUILayout.Label(ProfilerI18n.Get("search_placeholder"), GUILayout.Width(150));
-            searchModules = GUILayout.TextField(searchModules, GUILayout.Width(260));
+            searchModules = GUILayout.TextField(searchModules, GUILayout.Width(240));
             if (!string.IsNullOrEmpty(searchModules) && GUILayout.Button(ProfilerI18n.Get("clear_search"), GUILayout.Width(60)))
             {
                 searchModules = "";
+            }
+            GUILayout.Space(8);
+            string sortLockText = isSortLocked ? ProfilerI18n.Get("sort_lock_on") : ProfilerI18n.Get("sort_lock_off");
+            if (GUILayout.Button(sortLockText, GUILayout.Width(110)))
+            {
+                isSortLocked = !isSortLocked;
+            }
+            if (isSortLocked && GUILayout.Button(ProfilerI18n.Get("sort_refresh_now"), GUILayout.Width(100)))
+            {
+                cachedTopModules = ProfilerData.GetTopModules(60, searchModules, sortModulesCol, sortModulesAsc);
+                lastTableUpdateTime = Time.realtimeSinceStartup;
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -730,13 +1120,13 @@ namespace KSPPhysProfiler
             scrollPosModules = GUILayout.BeginScrollView(scrollPosModules);
 
             float now = Time.realtimeSinceStartup;
-            bool forceRefresh = cachedTopModules.Count == 0 ||
-                                now - lastTableUpdateTime >= UI_THROTTLE_INTERVAL ||
-                                searchModules != lastSearchModules ||
-                                sortModulesCol != lastSortModulesCol ||
-                                sortModulesAsc != lastSortModulesAsc;
+            bool sortChanged = searchModules != lastSearchModules ||
+                               sortModulesCol != lastSortModulesCol ||
+                               sortModulesAsc != lastSortModulesAsc;
 
-            if (forceRefresh)
+            bool shouldReorder = cachedTopModules.Count == 0 || sortChanged || (!isSortLocked && (now - lastTableUpdateTime >= 1.5f));
+
+            if (shouldReorder)
             {
                 cachedTopModules = ProfilerData.GetTopModules(60, searchModules, sortModulesCol, sortModulesAsc);
                 lastSearchModules = searchModules;
@@ -751,8 +1141,8 @@ namespace KSPPhysProfiler
             for (int i = 0; i < topModules.Count; i++)
             {
                 ModuleStats m = topModules[i];
-                double pct = (m.SmoothMs / totalFrameMs) * 100.0;
-                string colorStr = m.SmoothMs > 4.0 ? "#FF4444" : (m.SmoothMs > 1.2 ? "#FFAA22" : "#FFFFFF");
+                double pct = (m.DisplayMs / totalFrameMs) * 100.0;
+                string colorStr = m.DisplayMs > 4.0 ? "#FF4444" : (m.DisplayMs > 1.2 ? "#FFAA22" : "#FFFFFF");
 
                 string typeKey = "tab2::" + m.TypeName;
                 bool isExp = expandedTypes.Contains(typeKey);
@@ -767,8 +1157,14 @@ namespace KSPPhysProfiler
                         else expandedTypes.Add(typeKey);
                     }
                 }
-                GUILayout.Label($"{m.SmoothMs:F3} ms", GUILayout.Width(110));
-                GUILayout.Label($"{m.PeakMs:F2} ms", GUILayout.Width(100));
+
+                // Avg Ms + Micro Bar
+                GUILayout.BeginHorizontal(GUILayout.Width(110));
+                GUILayout.Label($"{m.DisplayMs:F2} ms", GUILayout.Width(62));
+                DrawMicroBar(m.DisplayMs, totalFrameMs, 40f);
+                GUILayout.EndHorizontal();
+
+                GUILayout.Label($"{m.DisplayPeakMs:F2} ms", GUILayout.Width(100));
                 GUILayout.Label($"{m.CurrentFrameCalls}", GUILayout.Width(100));
                 GUILayout.Label($"{pct:F1}%", GUILayout.Width(110));
                 GUILayout.Label($"{m.AssemblyName}", GUILayout.Width(170));
@@ -779,12 +1175,17 @@ namespace KSPPhysProfiler
                     foreach (var meth in m.GetSortedMethods())
                     {
                         if (meth.SmoothMs < 0.0005 && meth.CurrentFrameCalls == 0) continue;
-                        string mColor = meth.SmoothMs > 2.0 ? "#FF5555" : (meth.SmoothMs > 0.5 ? "#FFBB33" : "#88BBDD");
+                        string mColor = meth.DisplayMs > 2.0 ? "#FF5555" : (meth.DisplayMs > 0.5 ? "#FFBB33" : "#88BBDD");
                         GUILayout.BeginHorizontal();
                         GUILayout.Space(24);
                         GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.Width(326));
-                        GUILayout.Label($"{meth.SmoothMs:F3} ms", GUILayout.Width(110));
-                        GUILayout.Label($"{meth.PeakMs:F2} ms", GUILayout.Width(100));
+
+                        GUILayout.BeginHorizontal(GUILayout.Width(110));
+                        GUILayout.Label($"{meth.DisplayMs:F2} ms", GUILayout.Width(62));
+                        DrawMicroBar(meth.DisplayMs, totalFrameMs, 40f);
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", GUILayout.Width(100));
                         GUILayout.Label($"{meth.CurrentFrameCalls}", GUILayout.Width(100));
                         GUILayout.EndHorizontal();
                     }
@@ -808,13 +1209,24 @@ namespace KSPPhysProfiler
         {
             GUILayout.BeginVertical(cardStyle);
 
-            // Search Bar
+            // Search Bar & Sort Lock
             GUILayout.BeginHorizontal();
             GUILayout.Label(ProfilerI18n.Get("search_placeholder"), GUILayout.Width(150));
-            searchParts = GUILayout.TextField(searchParts, GUILayout.Width(260));
+            searchParts = GUILayout.TextField(searchParts, GUILayout.Width(240));
             if (!string.IsNullOrEmpty(searchParts) && GUILayout.Button(ProfilerI18n.Get("clear_search"), GUILayout.Width(60)))
             {
                 searchParts = "";
+            }
+            GUILayout.Space(8);
+            string sortLockText = isSortLocked ? ProfilerI18n.Get("sort_lock_on") : ProfilerI18n.Get("sort_lock_off");
+            if (GUILayout.Button(sortLockText, GUILayout.Width(110)))
+            {
+                isSortLocked = !isSortLocked;
+            }
+            if (isSortLocked && GUILayout.Button(ProfilerI18n.Get("sort_refresh_now"), GUILayout.Width(100)))
+            {
+                cachedTopParts = ProfilerData.GetTopParts(50, searchParts, sortPartsCol, sortPartsAsc);
+                lastTableUpdateTime = Time.realtimeSinceStartup;
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -840,13 +1252,13 @@ namespace KSPPhysProfiler
             scrollPosParts = GUILayout.BeginScrollView(scrollPosParts);
 
             float now = Time.realtimeSinceStartup;
-            bool forceRefresh = cachedTopParts.Count == 0 ||
-                                now - lastTableUpdateTime >= UI_THROTTLE_INTERVAL ||
-                                searchParts != lastSearchParts ||
-                                sortPartsCol != lastSortPartsCol ||
-                                sortPartsAsc != lastSortPartsAsc;
+            bool sortChanged = searchParts != lastSearchParts ||
+                               sortPartsCol != lastSortPartsCol ||
+                               sortPartsAsc != lastSortPartsAsc;
 
-            if (forceRefresh)
+            bool shouldReorder = cachedTopParts.Count == 0 || sortChanged || (!isSortLocked && (now - lastTableUpdateTime >= 1.5f));
+
+            if (shouldReorder)
             {
                 cachedTopParts = ProfilerData.GetTopParts(50, searchParts, sortPartsCol, sortPartsAsc);
                 lastSearchParts = searchParts;
@@ -856,16 +1268,22 @@ namespace KSPPhysProfiler
             }
 
             var topParts = cachedTopParts;
+            double totalFrameMs = Math.Max(0.001, ProfilerData.SmoothTotalFrameMs);
 
             for (int i = 0; i < topParts.Count; i++)
             {
                 PartStats p = topParts[i];
-                string colorStr = p.SmoothMs > 2.0 ? "#FF4444" : (p.SmoothMs > 0.8 ? "#FFAA22" : "#FFFFFF");
+                string colorStr = p.DisplayMs > 2.0 ? "#FF4444" : (p.DisplayMs > 0.8 ? "#FFAA22" : "#FFFFFF");
 
                 GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
                 GUILayout.Label($"<color={colorStr}>{p.PartTitle}</color>", headerStyle, GUILayout.Width(460));
                 GUILayout.Label(p.VesselName, GUILayout.Width(320));
-                GUILayout.Label($"{p.SmoothMs:F3} ms", GUILayout.Width(160));
+
+                GUILayout.BeginHorizontal(GUILayout.Width(160));
+                GUILayout.Label($"{p.DisplayMs:F2} ms", GUILayout.Width(70));
+                DrawMicroBar(p.DisplayMs, totalFrameMs, 60f);
+                GUILayout.EndHorizontal();
+
                 GUILayout.EndHorizontal();
             }
 
@@ -906,13 +1324,13 @@ namespace KSPPhysProfiler
 
             // Refresh cache
             float now = Time.realtimeSinceStartup;
-            bool forceRefresh = cachedAssemblyStats.Count == 0 ||
-                                now - lastAssemblyUpdateTime >= UI_THROTTLE_INTERVAL ||
-                                searchAssembly != lastSearchAssembly ||
-                                sortAssemblyCol != lastSortAssemblyCol ||
-                                sortAssemblyAsc != lastSortAssemblyAsc;
+            bool sortChanged = searchAssembly != lastSearchAssembly ||
+                               sortAssemblyCol != lastSortAssemblyCol ||
+                               sortAssemblyAsc != lastSortAssemblyAsc;
 
-            if (forceRefresh)
+            bool shouldReorder = cachedAssemblyStats.Count == 0 || sortChanged || (!isSortLocked && (now - lastAssemblyUpdateTime >= 1.5f));
+
+            if (shouldReorder)
             {
                 cachedAssemblyStats = ProfilerData.GetAssemblyBreakdown(searchAssembly, sortAssemblyCol, sortAssemblyAsc);
                 lastSearchAssembly = searchAssembly;
@@ -939,14 +1357,14 @@ namespace KSPPhysProfiler
             double drawnMs = 0;
             for (int i = 0; i < segCount; i++)
             {
-                float pct = (float)(asmList[i].SmoothMs / totalFrameMs);
+                float pct = (float)(asmList[i].DisplayMs / totalFrameMs);
                 float segW = totalBarW * pct;
                 if (segW < 0.5f) continue;
                 Color c = (i < asmBarColors.Length - 1) ? asmBarColors[i] : asmBarColors[asmBarColors.Length - 1];
                 GUI.color = c;
                 GUI.DrawTexture(new Rect(currentX, barY, segW, barH), whitePixelTex);
                 currentX += segW;
-                drawnMs += asmList[i].SmoothMs;
+                drawnMs += asmList[i].DisplayMs;
             }
             // Remaining unaccounted
             float remainPct = (float)((totalFrameMs - drawnMs) / totalFrameMs);
@@ -964,23 +1382,34 @@ namespace KSPPhysProfiler
                 string hex = (i < asmBarColorHex.Length) ? asmBarColorHex[i] : asmBarColorHex[asmBarColorHex.Length - 1];
                 string shortName = asmList[i].AssemblyName;
                 if (shortName.Length > 18) shortName = shortName.Substring(0, 15) + "...";
-                GUILayout.Label($"<color={hex}>■</color> <b>{shortName}:</b> {asmList[i].SmoothMs:F1}ms ({asmList[i].PctOfFrame:F1}%)", tipStyle);
+                GUILayout.Label($"<color={hex}>■</color> <b>{shortName}:</b> {asmList[i].DisplayMs:F1}ms ({asmList[i].PctOfFrame:F1}%)", tipStyle);
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
             GUILayout.Space(4);
 
-            // === Search Bar ===
+            // === Search Bar & Sort Lock ===
             GUILayout.BeginHorizontal();
             GUILayout.Label(ProfilerI18n.Get("search_placeholder"), GUILayout.Width(150));
-            searchAssembly = GUILayout.TextField(searchAssembly, GUILayout.Width(240));
-            if (!string.IsNullOrEmpty(searchAssembly) && GUILayout.Button(ProfilerI18n.Get("clear_search"), GUILayout.Width(60)))
+            searchAssembly = GUILayout.TextField(searchAssembly, GUILayout.Width(220));
+            if (!string.IsNullOrEmpty(searchAssembly) && GUILayout.Button(ProfilerI18n.Get("clear_search"), GUILayout.Width(50)))
             {
                 searchAssembly = "";
             }
-            GUILayout.Space(10);
-            if (GUILayout.Button(groupBySubsystems ? ProfilerI18n.Get("subsystem_toggle_on") : ProfilerI18n.Get("subsystem_toggle_off"), GUILayout.Width(170)))
+            GUILayout.Space(6);
+            string sortLockText = isSortLocked ? ProfilerI18n.Get("sort_lock_on") : ProfilerI18n.Get("sort_lock_off");
+            if (GUILayout.Button(sortLockText, GUILayout.Width(110)))
+            {
+                isSortLocked = !isSortLocked;
+            }
+            if (isSortLocked && GUILayout.Button(ProfilerI18n.Get("sort_refresh_now"), GUILayout.Width(100)))
+            {
+                cachedAssemblyStats = ProfilerData.GetAssemblyBreakdown(searchAssembly, sortAssemblyCol, sortAssemblyAsc);
+                lastAssemblyUpdateTime = Time.realtimeSinceStartup;
+            }
+            GUILayout.Space(6);
+            if (GUILayout.Button(groupBySubsystems ? ProfilerI18n.Get("subsystem_toggle_on") : ProfilerI18n.Get("subsystem_toggle_off"), GUILayout.Width(160)))
             {
                 groupBySubsystems = !groupBySubsystems;
             }
@@ -1038,8 +1467,12 @@ namespace KSPPhysProfiler
                     else
                         expandedAssemblies.Add(asm.AssemblyName);
                 }
-                GUILayout.Label($"{asm.SmoothMs:F3} ms", GUILayout.Width(110));
-                GUILayout.Label($"{asm.PeakMs:F2} ms", GUILayout.Width(100));
+                GUILayout.BeginHorizontal(GUILayout.Width(110));
+                GUILayout.Label($"{asm.DisplayMs:F2} ms", GUILayout.Width(62));
+                DrawMicroBar(asm.DisplayMs, totalFrameMs, 40f);
+                GUILayout.EndHorizontal();
+
+                GUILayout.Label($"{asm.DisplayPeakMs:F2} ms", GUILayout.Width(100));
                 GUILayout.Label($"{asm.ActiveTypeCount}", GUILayout.Width(100));
                 GUILayout.Label($"{asm.TotalCalls}", GUILayout.Width(100));
                 GUILayout.Label($"{asm.PctOfFrame:F1}%", GUILayout.Width(100));
@@ -1053,7 +1486,7 @@ namespace KSPPhysProfiler
                         var ns = asm.Namespaces[j];
                         if (ns.SmoothMs < 0.001 && ns.TotalCalls == 0) continue;
 
-                        string nsColorStr = ns.SmoothMs > 3.0 ? "#FF6666" : (ns.SmoothMs > 0.8 ? "#FFCC44" : "#AACCFF");
+                        string nsColorStr = ns.DisplayMs > 3.0 ? "#FF6666" : (ns.DisplayMs > 0.8 ? "#FFCC44" : "#AACCFF");
                         string nsKey = asm.AssemblyName + "::" + ns.Namespace;
                         bool nsExpanded = expandedNamespaces.Contains(nsKey);
                         string nsIcon = nsExpanded ? "  ▼" : "  ▶";
@@ -1072,8 +1505,13 @@ namespace KSPPhysProfiler
                             else
                                 expandedNamespaces.Add(nsKey);
                         }
-                        GUILayout.Label($"{ns.SmoothMs:F3} ms", GUILayout.Width(110));
-                        GUILayout.Label($"{ns.PeakMs:F2} ms", GUILayout.Width(100));
+
+                        GUILayout.BeginHorizontal(GUILayout.Width(110));
+                        GUILayout.Label($"{ns.DisplayMs:F2} ms", GUILayout.Width(62));
+                        DrawMicroBar(ns.DisplayMs, totalFrameMs, 40f);
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.Label($"{ns.DisplayPeakMs:F2} ms", GUILayout.Width(100));
                         GUILayout.Label($"{ns.ActiveTypeCount}", GUILayout.Width(100));
                         GUILayout.Label($"{ns.TotalCalls}", GUILayout.Width(100));
                         GUILayout.Label($"{ns.PctOfFrame:F1}%", GUILayout.Width(100));
@@ -1092,7 +1530,7 @@ namespace KSPPhysProfiler
                                     string subKey = nsKey + "::" + sub.SubsystemId;
                                     bool subExp = expandedSubsystems.Contains(subKey);
                                     string subIcon = subExp ? "    ▼ " : "    ▶ ";
-                                    string subColor = sub.SmoothMs > 2.0 ? "#FF8888" : (sub.SmoothMs > 0.5 ? "#FFDD66" : "#CCDDEE");
+                                    string subColor = sub.DisplayMs > 2.0 ? "#FF8888" : (sub.DisplayMs > 0.5 ? "#FFDD66" : "#CCDDEE");
 
                                     GUILayout.BeginHorizontal();
                                     GUILayout.Space(36);
@@ -1101,8 +1539,13 @@ namespace KSPPhysProfiler
                                         if (subExp) expandedSubsystems.Remove(subKey);
                                         else expandedSubsystems.Add(subKey);
                                     }
-                                    GUILayout.Label($"{sub.SmoothMs:F3} ms", GUILayout.Width(110));
-                                    GUILayout.Label($"{sub.PeakMs:F2} ms", GUILayout.Width(100));
+
+                                    GUILayout.BeginHorizontal(GUILayout.Width(110));
+                                    GUILayout.Label($"{sub.DisplayMs:F2} ms", GUILayout.Width(62));
+                                    DrawMicroBar(sub.DisplayMs, totalFrameMs, 40f);
+                                    GUILayout.EndHorizontal();
+
+                                    GUILayout.Label($"{sub.DisplayPeakMs:F2} ms", GUILayout.Width(100));
                                     GUILayout.Label($"{sub.ActiveTypeCount}", GUILayout.Width(100));
                                     GUILayout.Label($"{sub.TotalCalls}", GUILayout.Width(100));
                                     GUILayout.Label($"{sub.PctOfFrame:F1}%", GUILayout.Width(100));
@@ -1148,7 +1591,7 @@ namespace KSPPhysProfiler
             bool hasMethods = methods.Count > 0;
             string typeIcon = hasMethods ? (typeExpanded ? "▼ " : "▶ ") : "· ";
 
-            string tColorStr = t.SmoothMs > 2.0 ? "#FF5555" : (t.SmoothMs > 0.5 ? "#FFBB33" : "#88BBDD");
+            string tColorStr = t.DisplayMs > 2.0 ? "#FF5555" : (t.DisplayMs > 0.5 ? "#FFBB33" : "#88BBDD");
 
             GUILayout.BeginHorizontal();
             GUILayout.Space(indent);
@@ -1162,8 +1605,13 @@ namespace KSPPhysProfiler
                     else expandedTypes.Add(typeKey);
                 }
             }
-            GUILayout.Label($"{t.SmoothMs:F3} ms", GUILayout.Width(110));
-            GUILayout.Label($"{t.PeakMs:F2} ms", GUILayout.Width(100));
+
+            GUILayout.BeginHorizontal(GUILayout.Width(110));
+            GUILayout.Label($"{t.DisplayMs:F2} ms", GUILayout.Width(62));
+            DrawMicroBar(t.DisplayMs, ProfilerData.SmoothTotalFrameMs, 40f);
+            GUILayout.EndHorizontal();
+
+            GUILayout.Label($"{t.DisplayPeakMs:F2} ms", GUILayout.Width(100));
             GUILayout.Label($"{t.CurrentFrameCalls} calls", GUILayout.Width(100));
             GUILayout.EndHorizontal();
 
@@ -1180,7 +1628,7 @@ namespace KSPPhysProfiler
                     var subs = meth.GetSortedSubInvocations();
                     bool hasSubs = subs.Count > 0;
                     string methIcon = hasSubs ? (methExpanded ? "  ▼ " : "  ▶ ") : "  · ";
-                    string mColor = meth.SmoothMs > 1.5 ? "#FFAA22" : "#99DDFF";
+                    string mColor = meth.DisplayMs > 1.5 ? "#FFAA22" : "#99DDFF";
 
                     GUILayout.BeginHorizontal();
                     GUILayout.Space(indent + 16);
@@ -1194,8 +1642,13 @@ namespace KSPPhysProfiler
                             else expandedMethods.Add(methKey);
                         }
                     }
-                    GUILayout.Label($"{meth.SmoothMs:F3} ms", GUILayout.Width(110));
-                    GUILayout.Label($"{meth.PeakMs:F2} ms", GUILayout.Width(100));
+
+                    GUILayout.BeginHorizontal(GUILayout.Width(110));
+                    GUILayout.Label($"{meth.DisplayMs:F2} ms", GUILayout.Width(62));
+                    DrawMicroBar(meth.DisplayMs, ProfilerData.SmoothTotalFrameMs, 40f);
+                    GUILayout.EndHorizontal();
+
+                    GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", GUILayout.Width(100));
                     GUILayout.Label($"{meth.CurrentFrameCalls} calls", GUILayout.Width(100));
                     GUILayout.EndHorizontal();
 
@@ -1207,7 +1660,7 @@ namespace KSPPhysProfiler
                             var sub = subs[sIdx];
                             if (sub.SmoothMs < 0.0005 && sub.CurrentFrameCalls == 0) continue;
 
-                            string sColor = sub.SmoothMs > 1.0 ? "#FF5555" : (sub.SmoothMs > 0.3 ? "#FFAA22" : "#55FF88");
+                            string sColor = sub.DisplayMs > 1.0 ? "#FF5555" : (sub.DisplayMs > 0.3 ? "#FFAA22" : "#55FF88");
 
                             GUILayout.BeginHorizontal();
                             GUILayout.Space(indent + 32);
@@ -1215,8 +1668,13 @@ namespace KSPPhysProfiler
                             string subDisplay = $"⚡ <color=#00e5ff>[{sub.AssemblyName}]</color> {sub.TypeName}.{sub.MethodName}";
                             int subWidth = Math.Max(140, 360 - indent - 32);
                             GUILayout.Label($"<color={sColor}>{subDisplay}</color>", tipStyle, GUILayout.Width(subWidth));
-                            GUILayout.Label($"{sub.SmoothMs:F3} ms", GUILayout.Width(110));
-                            GUILayout.Label($"{sub.PeakMs:F2} ms", GUILayout.Width(100));
+
+                            GUILayout.BeginHorizontal(GUILayout.Width(110));
+                            GUILayout.Label($"{sub.DisplayMs:F2} ms", GUILayout.Width(62));
+                            DrawMicroBar(sub.DisplayMs, ProfilerData.SmoothTotalFrameMs, 40f);
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.Label($"{sub.DisplayPeakMs:F2} ms", GUILayout.Width(100));
                             GUILayout.Label($"{sub.CurrentFrameCalls} calls", GUILayout.Width(100));
                             GUILayout.EndHorizontal();
                         }

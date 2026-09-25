@@ -21,6 +21,9 @@ namespace KSPPhysProfiler
         public double PeakMs;
         public long TotalCalls;
 
+        public double DisplayMs;
+        public double DisplayPeakMs;
+
         public void ResetFrame()
         {
             CurrentFrameTicks = 0;
@@ -41,6 +44,12 @@ namespace KSPPhysProfiler
             {
                 PeakMs = frameMs;
             }
+
+            if (DisplayMs < 0.0001) DisplayMs = SmoothMs;
+            else DisplayMs = (DisplayMs * 0.85) + (SmoothMs * 0.15);
+
+            if (DisplayPeakMs < 0.0001) DisplayPeakMs = PeakMs;
+            else DisplayPeakMs = (DisplayPeakMs * 0.95) + (PeakMs * 0.05);
         }
     }
 
@@ -52,6 +61,9 @@ namespace KSPPhysProfiler
         public double SmoothMs;
         public double PeakMs;
         public long TotalCalls;
+
+        public double DisplayMs;
+        public double DisplayPeakMs;
 
         public Dictionary<string, SubInvocationStats> SubInvocations = new Dictionary<string, SubInvocationStats>(StringComparer.Ordinal);
 
@@ -101,6 +113,12 @@ namespace KSPPhysProfiler
                 PeakMs = frameMs;
             }
 
+            if (DisplayMs < 0.0001) DisplayMs = SmoothMs;
+            else DisplayMs = (DisplayMs * 0.85) + (SmoothMs * 0.15);
+
+            if (DisplayPeakMs < 0.0001) DisplayPeakMs = PeakMs;
+            else DisplayPeakMs = (DisplayPeakMs * 0.95) + (PeakMs * 0.05);
+
             foreach (var sub in SubInvocations.Values)
             {
                 double subMs = (double)sub.CurrentFrameTicks / Stopwatch.Frequency * 1000.0;
@@ -132,6 +150,9 @@ namespace KSPPhysProfiler
         public double SmoothMs;
         public double PeakMs;
         public long TotalCalls;
+
+        public double DisplayMs;
+        public double DisplayPeakMs;
 
         public Dictionary<string, MethodStats> Methods = new Dictionary<string, MethodStats>(StringComparer.Ordinal);
 
@@ -226,6 +247,12 @@ namespace KSPPhysProfiler
                 PeakMs = frameMs;
             }
 
+            if (DisplayMs < 0.0001) DisplayMs = SmoothMs;
+            else DisplayMs = (DisplayMs * 0.85) + (SmoothMs * 0.15);
+
+            if (DisplayPeakMs < 0.0001) DisplayPeakMs = PeakMs;
+            else DisplayPeakMs = (DisplayPeakMs * 0.95) + (PeakMs * 0.05);
+
             foreach (var m in Methods.Values)
             {
                 double mMs = (double)m.CurrentFrameTicks / Stopwatch.Frequency * 1000.0;
@@ -247,6 +274,7 @@ namespace KSPPhysProfiler
         public string VesselName;
         public double SmoothMs;
         public long CurrentFrameTicks;
+        public double DisplayMs;
 
         public void ResetFrame()
         {
@@ -261,6 +289,8 @@ namespace KSPPhysProfiler
         public void FinalizeFrame(double frameMs, double alpha = 0.1)
         {
             SmoothMs = (SmoothMs * (1.0 - alpha)) + (frameMs * alpha);
+            if (DisplayMs < 0.0001) DisplayMs = SmoothMs;
+            else DisplayMs = (DisplayMs * 0.85) + (SmoothMs * 0.15);
         }
     }
 
@@ -274,6 +304,8 @@ namespace KSPPhysProfiler
         public int TotalCalls;
         public double PctOfFrame;
         public List<ModuleStats> Types;
+        public double DisplayMs;
+        public double DisplayPeakMs;
     }
 
     public class AssemblyStats
@@ -285,6 +317,8 @@ namespace KSPPhysProfiler
         public int TotalCalls;
         public double PctOfFrame;
         public List<NamespaceStats> Namespaces;
+        public double DisplayMs;
+        public double DisplayPeakMs;
     }
 
     public class NamespaceStats
@@ -297,6 +331,8 @@ namespace KSPPhysProfiler
         public double PctOfFrame;
         public List<ModuleStats> Types;
         public List<SubsystemGroupStats> Subsystems;
+        public double DisplayMs;
+        public double DisplayPeakMs;
     }
 
     public static class SubsystemCategorizer
@@ -341,9 +377,55 @@ namespace KSPPhysProfiler
         }
     }
 
+    public class SpikeCulprit
+    {
+        public string Name;
+        public string AssemblyName;
+        public string Category; // "PartModule", "Plugin", "PhysX", "Mono GC", "Overhead"
+        public double FrameMs;
+        public double PctOfFrame;
+        public string TopMethod;
+    }
+
+    public class SpikeSnapshot
+    {
+        public int SpikeId;
+        public DateTime Timestamp;
+        public double FrameMs;
+        public double NormalAvgMs;
+        public double SpikeRatio;
+        public int GcCollections;
+        public bool IsGcPause;
+        public List<SpikeCulprit> Culprits = new List<SpikeCulprit>();
+    }
+
+    public class TimelineSample
+    {
+        public double[] TotalMs;
+        public double[] ModulesMs;
+        public double[] PluginsMs;
+        public double[] PhysXMs;
+        public double[] GpuMs;
+        public double[] OverheadMs;
+        public double[] Fps;
+        public double[] OnePctLow;
+        public bool[] IsSpike;
+        public int[] SpikeId;
+        public int Count;
+    }
+
     public static class ProfilerData
     {
         public static bool IsEnabled = true;
+
+        // Freeze and Spike Sniffer State
+        public static bool IsFrozen = false;
+        public static bool AutoFreezeOnSpike = false;
+        public static SpikeSnapshot LatestSpike;
+        public static readonly List<SpikeSnapshot> SpikeHistory = new List<SpikeSnapshot>();
+        public const int MAX_SPIKE_HISTORY = 10;
+        private static int nextSpikeId = 1;
+        private static int lastGcCount = -1;
 
         private static readonly Dictionary<Type, ModuleStats> moduleStatsMap = new Dictionary<Type, ModuleStats>();
         private static readonly Dictionary<Type, ModuleStats> pluginStatsMap = new Dictionary<Type, ModuleStats>();
@@ -354,6 +436,32 @@ namespace KSPPhysProfiler
         private static readonly double[] frameTimeHistory = new double[BUFFER_SIZE];
         private static int bufferIndex = 0;
         private static int historyCount = 0;
+
+        // Extended multi-layer timeline ring buffers (up to 600 frames)
+        public const int TIMELINE_BUFFER_SIZE = 600;
+        private static readonly double[] timelineTotalMs = new double[TIMELINE_BUFFER_SIZE];
+        private static readonly double[] timelineModulesMs = new double[TIMELINE_BUFFER_SIZE];
+        private static readonly double[] timelinePluginsMs = new double[TIMELINE_BUFFER_SIZE];
+        private static readonly double[] timelinePhysXMs = new double[TIMELINE_BUFFER_SIZE];
+        private static readonly double[] timelineGpuMs = new double[TIMELINE_BUFFER_SIZE];
+        private static readonly double[] timelineOverheadMs = new double[TIMELINE_BUFFER_SIZE];
+        private static readonly double[] timelineFps = new double[TIMELINE_BUFFER_SIZE];
+        private static readonly double[] timelineOnePctLow = new double[TIMELINE_BUFFER_SIZE];
+        private static readonly bool[] timelineIsSpike = new bool[TIMELINE_BUFFER_SIZE];
+        private static readonly int[] timelineSpikeId = new int[TIMELINE_BUFFER_SIZE];
+        private static int timelineIndex = 0;
+        private static int timelineCount = 0;
+
+        public static void ClearSpikeHistory()
+        {
+            SpikeHistory.Clear();
+            LatestSpike = null;
+        }
+
+        public static void ToggleFreeze()
+        {
+            IsFrozen = !IsFrozen;
+        }
 
         // Macro Timings (Instantaneous & Smoothed)
         public static double TotalFrameMs { get; private set; }
@@ -477,6 +585,7 @@ namespace KSPPhysProfiler
         public static void UpdateFrameMetrics()
         {
             if (!IsEnabled) return;
+            if (IsFrozen) return;
 
             QueryTUFXTelemetry();
 
@@ -494,6 +603,115 @@ namespace KSPPhysProfiler
             // Calculate PTR
             double fixedDeltaSec = Time.fixedDeltaTime * Time.timeScale;
             CurrentPTR = unscaledDelta > 0.0001 ? Math.Min(1.0, fixedDeltaSec / unscaledDelta) : 1.0;
+
+            // Detect Mono GC collections
+            int gcNow = GC.CollectionCount(0);
+            int gcDelta = (lastGcCount >= 0) ? Math.Max(0, gcNow - lastGcCount) : 0;
+            lastGcCount = gcNow;
+
+            // Spike / Micro-Stutter Detection (>2x average and >35ms, or >66.6ms)
+            bool isSpike = historyCount >= 10 && ((TotalFrameMs > SmoothTotalFrameMs * 2.0 && TotalFrameMs > 35.0) || TotalFrameMs > 66.6);
+            SpikeSnapshot spikeSnapshot = null;
+
+            if (isSpike)
+            {
+                spikeSnapshot = new SpikeSnapshot
+                {
+                    SpikeId = nextSpikeId++,
+                    Timestamp = DateTime.Now,
+                    FrameMs = TotalFrameMs,
+                    NormalAvgMs = SmoothTotalFrameMs > 0.001 ? SmoothTotalFrameMs : 16.6,
+                    SpikeRatio = SmoothTotalFrameMs > 0.001 ? (TotalFrameMs / SmoothTotalFrameMs) : (TotalFrameMs / 16.6),
+                    GcCollections = gcDelta,
+                    IsGcPause = gcDelta > 0
+                };
+
+                var culprits = new List<SpikeCulprit>();
+
+                foreach (var m in moduleStatsMap.Values)
+                {
+                    if (m.CurrentFrameTicks <= 0) continue;
+                    double ms = (double)m.CurrentFrameTicks / Stopwatch.Frequency * 1000.0;
+                    if (ms < 0.2) continue;
+
+                    string topMeth = "";
+                    long maxT = 0;
+                    foreach (var meth in m.Methods.Values)
+                    {
+                        if (meth.CurrentFrameTicks > maxT)
+                        {
+                            maxT = meth.CurrentFrameTicks;
+                            topMeth = meth.MethodName;
+                        }
+                    }
+
+                    culprits.Add(new SpikeCulprit
+                    {
+                        Name = m.TypeName,
+                        AssemblyName = m.AssemblyName,
+                        Category = "PartModule",
+                        FrameMs = ms,
+                        PctOfFrame = (ms / TotalFrameMs) * 100.0,
+                        TopMethod = topMeth
+                    });
+                }
+
+                foreach (var p in pluginStatsMap.Values)
+                {
+                    if (p.CurrentFrameTicks <= 0) continue;
+                    double ms = (double)p.CurrentFrameTicks / Stopwatch.Frequency * 1000.0;
+                    if (ms < 0.2) continue;
+
+                    string topMeth = "";
+                    long maxT = 0;
+                    foreach (var meth in p.Methods.Values)
+                    {
+                        if (meth.CurrentFrameTicks > maxT)
+                        {
+                            maxT = meth.CurrentFrameTicks;
+                            topMeth = meth.MethodName;
+                        }
+                    }
+
+                    culprits.Add(new SpikeCulprit
+                    {
+                        Name = p.TypeName,
+                        AssemblyName = p.AssemblyName,
+                        Category = "Plugin",
+                        FrameMs = ms,
+                        PctOfFrame = (ms / TotalFrameMs) * 100.0,
+                        TopMethod = topMeth
+                    });
+                }
+
+                if (spikeSnapshot.IsGcPause)
+                {
+                    culprits.Add(new SpikeCulprit
+                    {
+                        Name = "Mono GC (Garbage Collection)",
+                        AssemblyName = "mscorlib (Mono Runtime)",
+                        Category = "Mono GC",
+                        FrameMs = Math.Max(4.0, TotalFrameMs * 0.25),
+                        PctOfFrame = Math.Min(50.0, (Math.Max(4.0, TotalFrameMs * 0.25) / TotalFrameMs) * 100.0),
+                        TopMethod = "GC.Collect(0)"
+                    });
+                }
+
+                culprits.Sort((a, b) => b.FrameMs.CompareTo(a.FrameMs));
+                spikeSnapshot.Culprits = culprits.Take(6).ToList();
+
+                SpikeHistory.Add(spikeSnapshot);
+                if (SpikeHistory.Count > MAX_SPIKE_HISTORY)
+                {
+                    SpikeHistory.RemoveAt(0);
+                }
+                LatestSpike = spikeSnapshot;
+
+                if (AutoFreezeOnSpike)
+                {
+                    IsFrozen = true;
+                }
+            }
 
             // Aggregate Scripts
             double sumModuleMs = 0.0;
@@ -530,6 +748,20 @@ namespace KSPPhysProfiler
             double totalScripts = TotalModuleScriptMs + TotalPluginScriptMs;
             RenderAndGpuMs = Math.Max(0.0, TotalFrameMs - totalScripts - PhysXJointsMs);
 
+            if (isSpike && spikeSnapshot != null && PhysXJointsMs > 12.0)
+            {
+                spikeSnapshot.Culprits.Add(new SpikeCulprit
+                {
+                    Name = "PhysX Joints & Collisions",
+                    AssemblyName = "UnityEngine.PhysicsModule",
+                    Category = "PhysX",
+                    FrameMs = PhysXJointsMs,
+                    PctOfFrame = (PhysXJointsMs / TotalFrameMs) * 100.0,
+                    TopMethod = "Physics.Simulate"
+                });
+                spikeSnapshot.Culprits.Sort((a, b) => b.FrameMs.CompareTo(a.FrameMs));
+            }
+
             // Update Smoothed Exponential Moving Averages (EMA) for flicker-free display
             const double alpha = 0.15;
             if (SmoothTotalFrameMs < 0.0001)
@@ -554,6 +786,22 @@ namespace KSPPhysProfiler
                 SmoothPhysXJointsMs = (SmoothPhysXJointsMs * (1.0 - alpha)) + (PhysXJointsMs * alpha);
                 SmoothRenderAndGpuMs = (SmoothRenderAndGpuMs * (1.0 - alpha)) + (RenderAndGpuMs * alpha);
             }
+
+            // Record to timeline multi-layer ring buffers
+            double overhead = Math.Max(0.0, TotalFrameMs - TotalModuleScriptMs - TotalPluginScriptMs - PhysXJointsMs - RenderAndGpuMs);
+            timelineTotalMs[timelineIndex] = TotalFrameMs;
+            timelineModulesMs[timelineIndex] = TotalModuleScriptMs;
+            timelinePluginsMs[timelineIndex] = TotalPluginScriptMs;
+            timelinePhysXMs[timelineIndex] = PhysXJointsMs;
+            timelineGpuMs[timelineIndex] = RenderAndGpuMs;
+            timelineOverheadMs[timelineIndex] = overhead;
+            timelineFps[timelineIndex] = CurrentFPS;
+            timelineOnePctLow[timelineIndex] = OnePercentLowFPS;
+            timelineIsSpike[timelineIndex] = isSpike;
+            timelineSpikeId[timelineIndex] = spikeSnapshot != null ? spikeSnapshot.SpikeId : 0;
+
+            timelineIndex = (timelineIndex + 1) % TIMELINE_BUFFER_SIZE;
+            if (timelineCount < TIMELINE_BUFFER_SIZE) timelineCount++;
         }
 
         private static void CalculateFpsStatistics(double unscaledDelta)
@@ -609,6 +857,44 @@ namespace KSPPhysProfiler
             for (int i = 0; i < n; i++)
             {
                 sample[i] = frameTimeHistory[(startIdx + i) % BUFFER_SIZE];
+            }
+            return sample;
+        }
+
+        public static TimelineSample GetTimelineSample(int count = 100)
+        {
+            int n = Math.Min(count, timelineCount);
+            TimelineSample sample = new TimelineSample
+            {
+                TotalMs = new double[n],
+                ModulesMs = new double[n],
+                PluginsMs = new double[n],
+                PhysXMs = new double[n],
+                GpuMs = new double[n],
+                OverheadMs = new double[n],
+                Fps = new double[n],
+                OnePctLow = new double[n],
+                IsSpike = new bool[n],
+                SpikeId = new int[n],
+                Count = n
+            };
+
+            if (n == 0) return sample;
+
+            int startIdx = (timelineIndex - n + TIMELINE_BUFFER_SIZE) % TIMELINE_BUFFER_SIZE;
+            for (int i = 0; i < n; i++)
+            {
+                int idx = (startIdx + i) % TIMELINE_BUFFER_SIZE;
+                sample.TotalMs[i] = timelineTotalMs[idx];
+                sample.ModulesMs[i] = timelineModulesMs[idx];
+                sample.PluginsMs[i] = timelinePluginsMs[idx];
+                sample.PhysXMs[i] = timelinePhysXMs[idx];
+                sample.GpuMs[i] = timelineGpuMs[idx];
+                sample.OverheadMs[i] = timelineOverheadMs[idx];
+                sample.Fps[i] = timelineFps[idx];
+                sample.OnePctLow[i] = timelineOnePctLow[idx];
+                sample.IsSpike[i] = timelineIsSpike[idx];
+                sample.SpikeId[i] = timelineSpikeId[idx];
             }
             return sample;
         }
@@ -935,6 +1221,8 @@ namespace KSPPhysProfiler
                                 DisplayName = ProfilerI18n.Get(subKvp.Key),
                                 SmoothMs = subSmooth,
                                 PeakMs = subPeak,
+                                DisplayMs = subSmooth,
+                                DisplayPeakMs = subPeak,
                                 ActiveTypeCount = subActive,
                                 TotalCalls = subCalls,
                                 PctOfFrame = (subSmooth / totalFrameMs) * 100.0,
@@ -949,6 +1237,8 @@ namespace KSPPhysProfiler
                         Namespace = nsKvp.Key,
                         SmoothMs = nsSmoothMs,
                         PeakMs = nsPeakMs,
+                        DisplayMs = nsSmoothMs,
+                        DisplayPeakMs = nsPeakMs,
                         ActiveTypeCount = nsActive,
                         TotalCalls = nsCalls,
                         PctOfFrame = (nsSmoothMs / totalFrameMs) * 100.0,
@@ -963,6 +1253,8 @@ namespace KSPPhysProfiler
                     AssemblyName = asmName,
                     SmoothMs = asmSmoothMs,
                     PeakMs = asmPeakMs,
+                    DisplayMs = asmSmoothMs,
+                    DisplayPeakMs = asmPeakMs,
                     ActiveTypeCount = asmActiveTypes,
                     TotalCalls = asmCalls,
                     PctOfFrame = (asmSmoothMs / totalFrameMs) * 100.0,
