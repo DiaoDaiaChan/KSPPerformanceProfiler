@@ -411,6 +411,7 @@ namespace KSPPhysProfiler
         public double[] OnePctLow;
         public bool[] IsSpike;
         public int[] SpikeId;
+        public int[] GcCollections;
         public int Count;
     }
 
@@ -426,6 +427,16 @@ namespace KSPPhysProfiler
         public const int MAX_SPIKE_HISTORY = 10;
         private static int nextSpikeId = 1;
         private static int lastGcCount = -1;
+
+        // Real-time Mono GC Monitoring
+        public static int GcCollectionsThisFrame { get; private set; }
+        public static int GcTotalCollections { get; private set; }
+        public static int GcFramesSinceLastCollect { get; private set; }
+        public static bool IsGcThisFrame { get; private set; }
+        public static double GcCollectionsPerSec { get; private set; }
+        private static int gcFrameCounter = 0;
+        private static double gcRateAccum = 0;
+        private static float gcRateTimer = 0f;
 
         private static readonly Dictionary<Type, ModuleStats> moduleStatsMap = new Dictionary<Type, ModuleStats>();
         private static readonly Dictionary<Type, ModuleStats> pluginStatsMap = new Dictionary<Type, ModuleStats>();
@@ -450,6 +461,7 @@ namespace KSPPhysProfiler
         private static readonly double[] timelineOnePctLow = new double[TIMELINE_BUFFER_SIZE];
         private static readonly bool[] timelineIsSpike = new bool[TIMELINE_BUFFER_SIZE];
         private static readonly int[] timelineSpikeId = new int[TIMELINE_BUFFER_SIZE];
+        private static readonly int[] timelineGcCollections = new int[TIMELINE_BUFFER_SIZE];
         private static int timelineIndex = 0;
         private static int timelineCount = 0;
 
@@ -614,6 +626,30 @@ namespace KSPPhysProfiler
             int gcNow = GC.CollectionCount(0);
             int gcDelta = (lastGcCount >= 0) ? Math.Max(0, gcNow - lastGcCount) : 0;
             lastGcCount = gcNow;
+
+            // Real-time GC monitoring
+            GcCollectionsThisFrame = gcDelta;
+            IsGcThisFrame = gcDelta > 0;
+            GcTotalCollections += gcDelta;
+            if (gcDelta > 0)
+            {
+                gcFrameCounter = 0;
+            }
+            else
+            {
+                gcFrameCounter++;
+            }
+            GcFramesSinceLastCollect = gcFrameCounter;
+
+            // GC rate per second (computed every second)
+            gcRateAccum += gcDelta;
+            gcRateTimer += Time.unscaledDeltaTime;
+            if (gcRateTimer >= 1.0f)
+            {
+                GcCollectionsPerSec = gcRateAccum / gcRateTimer;
+                gcRateAccum = 0;
+                gcRateTimer = 0f;
+            }
 
             // Spike / Micro-Stutter Detection (>2x average and >35ms, or >66.6ms)
             bool isSpike = historyCount >= 10 && ((TotalFrameMs > SmoothTotalFrameMs * 2.0 && TotalFrameMs > 35.0) || TotalFrameMs > 66.6);
@@ -805,6 +841,7 @@ namespace KSPPhysProfiler
             timelineOnePctLow[timelineIndex] = OnePercentLowFPS;
             timelineIsSpike[timelineIndex] = isSpike;
             timelineSpikeId[timelineIndex] = spikeSnapshot != null ? spikeSnapshot.SpikeId : 0;
+            timelineGcCollections[timelineIndex] = gcDelta;
 
             timelineIndex = (timelineIndex + 1) % TIMELINE_BUFFER_SIZE;
             if (timelineCount < TIMELINE_BUFFER_SIZE) timelineCount++;
@@ -867,6 +904,7 @@ namespace KSPPhysProfiler
             OnePctLow = new double[TIMELINE_BUFFER_SIZE],
             IsSpike = new bool[TIMELINE_BUFFER_SIZE],
             SpikeId = new int[TIMELINE_BUFFER_SIZE],
+            GcCollections = new int[TIMELINE_BUFFER_SIZE],
             Count = 0
         };
 
@@ -914,6 +952,7 @@ namespace KSPPhysProfiler
                 cachedTimelineSample.OnePctLow[i] = timelineOnePctLow[idx];
                 cachedTimelineSample.IsSpike[i] = timelineIsSpike[idx];
                 cachedTimelineSample.SpikeId[i] = timelineSpikeId[idx];
+                cachedTimelineSample.GcCollections[i] = timelineGcCollections[idx];
             }
             return cachedTimelineSample;
         }

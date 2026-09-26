@@ -453,6 +453,23 @@ namespace KSPPhysProfiler
             GUILayout.Label($"<b>PTR:</b> <color={ptrColor}><b>{ptrStatusText}</b></color>", ptrStyle, GUILayout.Width(95));
             GUILayout.Label($"<b>{ProfilerI18n.Get("metric_total_frame")}:</b> {ProfilerData.SmoothTotalFrameMs:F1}ms (<color={jitterColor}>{jitter:F1}ms</color>)", headerStyle, GUILayout.Width(170));
 
+            // Real-time Mono GC Monitor Badge
+            string gcBadge;
+            if (ProfilerData.IsGcThisFrame)
+            {
+                gcBadge = $"<color=#ff3333><b>🗑️ GC!</b> ({ProfilerData.GcCollectionsThisFrame}x)</color>";
+            }
+            else if (ProfilerData.GcCollectionsPerSec > 0.5)
+            {
+                gcBadge = $"<color=#ffaa22>🗑️ GC: {ProfilerData.GcCollectionsPerSec:F1}/s</color>";
+            }
+            else
+            {
+                string gcColor = ProfilerData.GcFramesSinceLastCollect > 300 ? "#33FF33" : "#aaaaaa";
+                gcBadge = $"<color={gcColor}>GC: {ProfilerData.GcTotalCollections}</color>";
+            }
+            GUILayout.Label(gcBadge, headerStyle, GUILayout.Width(105));
+
             GUILayout.FlexibleSpace();
 
             // Window size indicator
@@ -763,6 +780,8 @@ namespace KSPPhysProfiler
 
                 GUILayout.Space(8);
                 GUILayout.Label("<color=#ff5555>▼</color> 尖峰", tipStyle);
+                GUILayout.Space(4);
+                GUILayout.Label("<color=#ff8800>◆</color> GC", tipStyle);
             }
             else
             {
@@ -944,6 +963,15 @@ namespace KSPPhysProfiler
                             Rect markerRect = new Rect(xPos - 3, innerY - 2, 12, 14);
                             GUI.Label(markerRect, "▼", headerStyle);
                         }
+
+                        // GC Event Marker ◆
+                        if (timeline.GcCollections[i] > 0)
+                        {
+                            GUI.color = new Color(1f, 0.5f, 0.1f, 1f);
+                            float gcMarkerY = timeline.IsSpike[i] ? innerY + 10 : innerY - 2;
+                            Rect gcMarkerRect = new Rect(xPos - 2, gcMarkerY, 10, 12);
+                            GUI.Label(gcMarkerRect, "◆", tipStyle);
+                        }
                     }
                     GUI.color = Color.white;
                 }
@@ -990,6 +1018,15 @@ namespace KSPPhysProfiler
                             GUI.color = new Color(1f, 0.2f, 0.2f, 1f);
                             Rect markerRect = new Rect(xPos - 3, innerY - 2, 12, 14);
                             GUI.Label(markerRect, "▼", headerStyle);
+                        }
+
+                        // GC Event Marker ◆
+                        if (timeline.GcCollections[i] > 0)
+                        {
+                            GUI.color = new Color(1f, 0.5f, 0.1f, 1f);
+                            float gcMarkerY = timeline.IsSpike[i] ? innerY + 10 : innerY - 2;
+                            Rect gcMarkerRect = new Rect(xPos - 2, gcMarkerY, 10, 12);
+                            GUI.Label(gcMarkerRect, "◆", tipStyle);
                         }
                     }
                     GUI.color = Color.white;
@@ -1050,6 +1087,13 @@ namespace KSPPhysProfiler
                     GUILayout.Label($"<color=#ff3333><b>{ProfilerI18n.Get("graph_hover_spike_tag")}</b></color>", headerStyle);
                 }
 
+                // GC event indicator for inspected frame
+                int hGc = timeline.GcCollections[curInspect];
+                if (hGc > 0)
+                {
+                    GUILayout.Label($"<color=#ff8800><b>◆ GC×{hGc}</b></color>", headerStyle);
+                }
+
                 GUILayout.FlexibleSpace();
 
                 if (lockedTimelineIdx >= 0)
@@ -1067,16 +1111,25 @@ namespace KSPPhysProfiler
             {
                 // Standard summary bar when no frame is hovered
                 GUILayout.BeginHorizontal("box");
-                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_physx")}:</b> {ProfilerData.SmoothPhysicsStepMs:F2} ms", tipStyle, GUILayout.Width(190));
-                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_camera")}:</b> {ProfilerData.CameraRenderMs:F2} ms", tipStyle, GUILayout.Width(190));
-                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_modules")}:</b> {ProfilerData.SmoothModuleScriptMs:F2} ms", tipStyle, GUILayout.Width(190));
-                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_plugins")}:</b> {ProfilerData.SmoothPluginScriptMs:F2} ms", tipStyle, GUILayout.Width(190));
+                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_physx")}:</b> {ProfilerData.SmoothPhysicsStepMs:F2} ms", tipStyle, GUILayout.Width(170));
+                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_camera")}:</b> {ProfilerData.CameraRenderMs:F2} ms", tipStyle, GUILayout.Width(170));
+                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_modules")}:</b> {ProfilerData.SmoothModuleScriptMs:F2} ms", tipStyle, GUILayout.Width(170));
+                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_plugins")}:</b> {ProfilerData.SmoothPluginScriptMs:F2} ms", tipStyle, GUILayout.Width(170));
                 if (ProfilerData.IsTUFXDetected)
                 {
-                    GUILayout.Label($"<b><color=#00e5ff>TUFX:</color></b> {ProfilerData.TUFXPostProcessMs:F2} ms", tipStyle, GUILayout.Width(180));
+                    GUILayout.Label($"<b><color=#00e5ff>TUFX:</color></b> {ProfilerData.TUFXPostProcessMs:F2} ms", tipStyle, GUILayout.Width(140));
                 }
+
+                // Mono GC real-time stats
+                double heapMb = MonoHeapPadder.CurrentHeapMb;
+                double freeMb = MonoHeapPadder.CurrentFreeMb;
+                string heapColor = freeMb >= 800.0 ? "#33FF33" : (freeMb >= 300.0 ? "#FFFF33" : "#FF3333");
+                string gcRateStr = ProfilerData.GcCollectionsPerSec > 0.1
+                    ? $"<color=#ff8800>{ProfilerData.GcCollectionsPerSec:F1}/s</color>"
+                    : $"<color=#33FF33>0/s</color>";
+                GUILayout.Label($"<b>🗑️ Mono:</b> <color={heapColor}>{freeMb:F0}MB</color> GC: {gcRateStr}", tipStyle);
+
                 GUILayout.FlexibleSpace();
-                GUILayout.Label("<color=#888888>(鼠标悬停图表可检视单帧微秒级构成)</color>", tipStyle);
                 GUILayout.EndHorizontal();
             }
 
