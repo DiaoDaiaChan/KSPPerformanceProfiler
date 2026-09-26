@@ -122,7 +122,7 @@
 
     "bn_stutter_title": "⚠️ Severe Micro-Stutters & Jitter (Micro-Stutter / GC Spikes)",
     "bn_stutter_desc": "Average FPS is {0:F1}, but 1% Low plummeted to {1:F1} FPS with high jitter ({2:F1}ms).",
-    "bn_stutter_tip": "Main causes: Unity Mono garbage collection (GC) pauses, burst disk/audio I/O, or cyclic mod routines. Suggestions: Install MemGraph / HeapPadder to pad Mono heap and prevent frequent GC cycles.",
+    "bn_stutter_tip": "Main causes: Unity Mono garbage collection (GC) pauses or cyclic mod routines. Suggestions: Click [Quick Pad Heap] below or pad 2-4GB in Optimization Settings to significantly delay GC pauses!",
 
     "budget_bar_title": "Frame Time Budget Breakdown",
     "legend_modules": "PartModules",
@@ -148,7 +148,7 @@
     "help_jitter_q": "What is Frame Jitter?",
     "help_jitter_a": "• Standard deviation of frame times. Below 2ms is exceptionally smooth; above 6ms causes prominent tearing and uneven pacing.",
     "help_mod_tuning_q": "Mod Optimization Tips:",
-    "help_mod_tuning_a": "1. Physics Lag: Install KSPCommunityFixes and avoid excessive AutoStruts.\n2. GC Hitching: Install HeapPadder / MemGraph to allocate a larger heap cushion.\n3. GPU Lag: Tweak Scatterer / TUFX antialiasing and Parallax terrain tessellation settings.",
+    "help_mod_tuning_a": "1. Physics Lag: Install KSPCommunityFixes and avoid excessive AutoStruts.\n2. GC Hitching: Use this mod's built-in [Mono Heap Padder] (Hotkey: Alt+End) to pad 2-4GB virtual heap, extending GC pause intervals from seconds to dozens of minutes.\n3. GPU Lag: Tweak Scatterer / TUFX antialiasing and Parallax terrain tessellation settings.",
 
     "msg_report_saved": "Performance diagnostic report saved to:\nGameData/KSPPhysProfiler/Logs/{0}",
     "msg_report_fail": "Failed to save performance report: {0}",
@@ -196,6 +196,21 @@
     "culprit_physx": "PhysX Joints & Solver",
     "culprit_gpu": "GPU Shaders & Render Wait",
     "culprit_mono_gc": "Mono GC (Garbage Collection)",
-    "culprit_physx_joints": "PhysX Joints & Collisions"
+    "culprit_physx_joints": "PhysX Joints & Collisions",
+
+    "pad_card_title": "⚡ Mono Heap Padder & GC Stutter Management",
+    "pad_card_desc": "Pre-allocates managed heap headroom to eliminate periodic Mono GC Stop-The-World stutters!",
+    "pad_heap_stat": "Mono Heap Size: <b>{0:F0} MB</b> | Used: {1:F0} MB | Free Headroom: <color={2}><b>{3:F0} MB</b></color> (System RAM: {4} GB)",
+    "pad_btn_preset": "⚡ Pad to {0} MB ({1} GB)",
+    "pad_btn_apply": "Apply Padding",
+    "pad_auto_toggle": "Auto-Pad on Scene Load",
+    "pad_hotkey_toggle": "Hotkey (Alt + End) to Pad",
+    "pad_force_gc": "🧹 Run Manual Garbage Collection (GC Collect)",
+    "pad_status_success": "Successfully padded Mono heap to {0} MB! Free headroom: {1} MB",
+    "pad_status_ok": "🟢 Heap Headroom Optimal (Generous headroom, GC pauses significantly delayed)",
+    "pad_status_warn": "🟡 Low Heap Headroom (Only {0:F0} MB free, frequent GC pauses likely, padding recommended)",
+    "pad_hero_advice": "GC pause stutter detected! Free headroom is low. Click Quick Pad Heap to eliminate GC spikes!",
+    "pad_hero_btn": "⚡ Quick Pad Heap",
+    "pad_msg_gc_freed": "[KSPPhysProfiler] 🧹 Manual GC complete! Reclaimed ~{0} MB managed memory (Current free: {1:F0} MB)"
   }
 }

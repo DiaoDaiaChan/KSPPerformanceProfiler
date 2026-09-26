@@ -36,11 +36,13 @@ namespace KSPPhysProfiler
 
         private void Start()
         {
+            MonoHeapPadder.Initialize();
             StartCoroutine(EndOfFixedUpdateRoutine());
             GameEvents.onGUIApplicationLauncherReady.Add(OnAppLauncherReady);
             GameEvents.onGUIApplicationLauncherDestroyed.Add(OnAppLauncherDestroyed);
 
             GameEvents.onGameSceneSwitchRequested.Add(OnSceneSwitchRequested);
+            GameEvents.onLevelWasLoadedGUIReady.Add(OnLevelLoadedGUIReady);
             GameEvents.onVesselChange.Add(OnVesselChange);
             GameEvents.onVesselWillDestroy.Add(OnVesselWillDestroy);
 
@@ -59,6 +61,7 @@ namespace KSPPhysProfiler
             GameEvents.onGUIApplicationLauncherDestroyed.Remove(OnAppLauncherDestroyed);
 
             GameEvents.onGameSceneSwitchRequested.Remove(OnSceneSwitchRequested);
+            GameEvents.onLevelWasLoadedGUIReady.Remove(OnLevelLoadedGUIReady);
             GameEvents.onVesselChange.Remove(OnVesselChange);
             GameEvents.onVesselWillDestroy.Remove(OnVesselWillDestroy);
 
@@ -141,6 +144,17 @@ namespace KSPPhysProfiler
                     ScreenMessageStyle.LOWER_CENTER
                 );
             }
+            else if (MonoHeapPadder.EnableHotkey &&
+                     (isAltPressed || GameSettings.MODIFIER_KEY.GetKey()) &&
+                     Input.GetKeyDown(KeyCode.End))
+            {
+                MonoHeapPadder.Pad(MonoHeapPadder.TargetPadMb > 0 ? MonoHeapPadder.TargetPadMb : MonoHeapPadder.RecommendedPadMb);
+            }
+        }
+
+        private void OnLevelLoadedGUIReady(GameScenes scene)
+        {
+            MonoHeapPadder.OnSceneLoaded();
         }
 
         private void FixedUpdate()

@@ -372,6 +372,20 @@ namespace KSPPhysProfiler
                 GUILayout.Space(6);
             }
 
+            // Quick Pad Button if unpadded, low headroom, or stutter bound
+            if (!MonoHeapPadder.IsPadded || diag.Type == BottleneckType.StutterJitterBound || MonoHeapPadder.CurrentFreeMb < 400.0)
+            {
+                Color prevPadCol = GUI.backgroundColor;
+                GUI.backgroundColor = new Color(0.2f, 0.9f, 0.5f, 1f);
+                string quickPadLabel = ProfilerI18n.Get("pad_hero_btn");
+                if (GUILayout.Button(quickPadLabel, GUILayout.Width(140), GUILayout.Height(23)))
+                {
+                    MonoHeapPadder.Pad(MonoHeapPadder.TargetPadMb);
+                }
+                GUI.backgroundColor = prevPadCol;
+                GUILayout.Space(6);
+            }
+
             // KILLER FEATURE: Auto-Freeze Toggle Button
             string freezeBtnText = ProfilerData.AutoFreezeOnSpike ? ProfilerI18n.Get("hero_auto_freeze_on") : ProfilerI18n.Get("hero_auto_freeze_off");
             Color prevBg = GUI.backgroundColor;
@@ -420,6 +434,19 @@ namespace KSPPhysProfiler
             {
                 GUILayout.BeginHorizontal("box");
                 GUILayout.Label($"💡 <b>{ProfilerI18n.Get("bn_advice_label")}:</b> {diag.Advice}", tipStyle);
+
+                if (!MonoHeapPadder.IsPadded || MonoHeapPadder.CurrentFreeMb < 500.0 || diag.Type == BottleneckType.StutterJitterBound)
+                {
+                    Color prevBg2 = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(0.2f, 0.9f, 0.5f, 1f);
+                    string quickPadLabel = ProfilerI18n.Get("pad_hero_btn");
+                    if (GUILayout.Button(quickPadLabel, GUILayout.Width(140), GUILayout.Height(22)))
+                    {
+                        MonoHeapPadder.Pad(MonoHeapPadder.TargetPadMb);
+                    }
+                    GUI.backgroundColor = prevBg2;
+                }
+
                 GUILayout.EndHorizontal();
             }
 
@@ -1729,7 +1756,89 @@ namespace KSPPhysProfiler
 
             GUILayout.Space(6);
 
-            // Section 2: Concrete Lag Countermeasures
+            // Section 2: Mono Heap Padder & GC Stutter Management Card
+            GUILayout.BeginVertical("box");
+            GUILayout.Label($"<b>{ProfilerI18n.Get("pad_card_title")}</b>", headerStyle);
+            GUILayout.Label(ProfilerI18n.Get("pad_card_desc"), tipStyle);
+            GUILayout.Space(4);
+
+            // Realtime heap status display
+            double heapMb = MonoHeapPadder.CurrentHeapMb;
+            double usedMb = MonoHeapPadder.CurrentUsedMb;
+            double freeMb = MonoHeapPadder.CurrentFreeMb;
+            int ramGb = Math.Max(1, MonoHeapPadder.SystemRamMb / 1024);
+            string freeColor = freeMb >= 800.0 ? "#33FF33" : (freeMb >= 300.0 ? "#FFFF33" : "#FF3333");
+            
+            GUILayout.Label(ProfilerI18n.Format("pad_heap_stat", heapMb, usedMb, freeColor, freeMb, ramGb), headerStyle);
+            GUILayout.Space(6);
+
+            // Presets and Buttons
+            GUILayout.BeginHorizontal();
+
+            int[] presets = new int[] { 2048, 4096, 6144 };
+            for (int i = 0; i < presets.Length; i++)
+            {
+                int mb = presets[i];
+                bool isCurrent = MonoHeapPadder.TargetPadMb == mb;
+                Color prevBg = GUI.backgroundColor;
+                if (isCurrent) GUI.backgroundColor = new Color(0.2f, 0.9f, 0.5f, 1f);
+
+                string btnText = ProfilerI18n.Format("pad_btn_preset", mb, mb / 1024);
+                if (GUILayout.Button(btnText, GUILayout.Width(160), GUILayout.Height(25)))
+                {
+                    MonoHeapPadder.TargetPadMb = mb;
+                    MonoHeapPadder.Pad(mb);
+                }
+                GUI.backgroundColor = prevBg;
+                GUILayout.Space(4);
+            }
+
+            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_btn_apply")}</b>", GUILayout.Width(120), GUILayout.Height(25)))
+            {
+                MonoHeapPadder.Pad(MonoHeapPadder.TargetPadMb);
+            }
+
+            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_force_gc")}</b>", GUILayout.Width(250), GUILayout.Height(25)))
+            {
+                MonoHeapPadder.ForceGarbageCollection();
+            }
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(6);
+
+            // Toggles: AutoPad on scene change & Hotkey
+            GUILayout.BeginHorizontal();
+            
+            bool newAuto = GUILayout.Toggle(MonoHeapPadder.AutoPadOnSceneChange, $" <b>{ProfilerI18n.Get("pad_auto_toggle")}</b>", GUILayout.Width(260));
+            if (newAuto != MonoHeapPadder.AutoPadOnSceneChange)
+            {
+                MonoHeapPadder.AutoPadOnSceneChange = newAuto;
+                MonoHeapPadder.SaveConfig();
+            }
+
+            bool newHotkey = GUILayout.Toggle(MonoHeapPadder.EnableHotkey, $" <b>{ProfilerI18n.Get("pad_hotkey_toggle")}</b>", GUILayout.Width(280));
+            if (newHotkey != MonoHeapPadder.EnableHotkey)
+            {
+                MonoHeapPadder.EnableHotkey = newHotkey;
+                MonoHeapPadder.SaveConfig();
+            }
+
+            GUILayout.FlexibleSpace();
+
+            // Status message
+            if (!string.IsNullOrEmpty(MonoHeapPadder.LastStatusMessage))
+            {
+                GUILayout.Label(MonoHeapPadder.LastStatusMessage, tipStyle);
+            }
+
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+
+            GUILayout.Space(6);
+
+            // Section 3: Concrete Lag Countermeasures
             GUILayout.BeginVertical("box");
             GUILayout.Label($"<b>💡 {ProfilerI18n.Get("help_mod_tuning_q")}</b>", headerStyle);
             GUILayout.Label(ProfilerI18n.Get("help_mod_tuning_a"), tipStyle);
