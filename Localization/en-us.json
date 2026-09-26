@@ -211,6 +211,15 @@
     "pad_status_warn": "🟡 Low Heap Headroom (Only {0:F0} MB free, frequent GC pauses likely, padding recommended)",
     "pad_hero_advice": "GC pause stutter detected! Free headroom is low. Click Quick Pad Heap to eliminate GC spikes!",
     "pad_hero_btn": "⚡ Quick Pad Heap",
-    "pad_msg_gc_freed": "[KSPPhysProfiler] 🧹 Manual GC complete! Reclaimed ~{0} MB managed memory (Current free: {1:F0} MB)"
+    "pad_msg_gc_freed": "[KSPPhysProfiler] 🧹 Manual GC complete! Reclaimed ~{0} MB managed memory (Current free: {1:F0} MB)",
+
+    "graph_unlock_btn": "✕ Unlock",
+    "graph_hover_locked": "🔒 [Locked Frame]",
+    "graph_hover_tracking": "🔍 [Inspecting]",
+    "graph_hover_spike_tag": "🚨 Stutter Spike",
+    "graph_axis_60": "16.7ms (60F)",
+    "graph_axis_30": "33.3ms (30F)",
+    "graph_axis_20": "50.0ms (20F)",
+    "window_size_info": "📐 {0:F0}×{1:F0}"
   }
 }

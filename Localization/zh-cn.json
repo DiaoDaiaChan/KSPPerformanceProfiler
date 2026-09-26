@@ -211,6 +211,15 @@
     "pad_status_warn": "🟡 堆内存缓冲较小 (空闲仅 {0:F0} MB，容易频繁触发 GC 停顿，建议垫高)",
     "pad_hero_advice": "检测到 GC 停顿引发卡顿！当前空闲缓冲不足。建议点击右侧【一键垫高堆内存】彻底消除 GC 刺客！",
     "pad_hero_btn": "⚡ 一键垫高堆内存",
-    "pad_msg_gc_freed": "[KSPPhysProfiler] 🧹 GC 手动回收完成！释放了约 {0} MB 托管内存 (当前空闲: {1:F0} MB)"
+    "pad_msg_gc_freed": "[KSPPhysProfiler] 🧹 GC 手动回收完成！释放了约 {0} MB 托管内存 (当前空闲: {1:F0} MB)",
+
+    "graph_unlock_btn": "✕ 解锁",
+    "graph_hover_locked": "🔒 [已锁定检视]",
+    "graph_hover_tracking": "🔍 [悬停检视]",
+    "graph_hover_spike_tag": "🚨 掉帧卡顿尖峰",
+    "graph_axis_60": "16.7ms (60F)",
+    "graph_axis_30": "33.3ms (30F)",
+    "graph_axis_20": "50.0ms (20F)",
+    "window_size_info": "📐 {0:F0}×{1:F0}"
   }
 }

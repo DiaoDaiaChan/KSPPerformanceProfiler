@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace KSPPhysProfiler
@@ -88,6 +89,24 @@ namespace KSPPhysProfiler
         private readonly double[] miniSparklineBuffer = new double[50];
         private int subTabScripts = 0;
 
+        // Window Resizing & Adaptive Layout
+        private bool isResizing = false;
+        private Vector2 resizeStartMouse;
+        private Vector2 resizeStartSize;
+        private const float MIN_WINDOW_WIDTH = 850f;
+        private const float MIN_WINDOW_HEIGHT = 520f;
+        private const float RESIZE_HANDLE_SIZE = 24f;
+        private GUIStyle resizeGripStyle;
+
+        // Interactive Timeline Graph Filters & Inspection
+        private bool showLayerModules = true;
+        private bool showLayerPlugins = true;
+        private bool showLayerPhysx = true;
+        private bool showLayerGpu = true;
+        private bool showLayerOverhead = true;
+        private int hoveredTimelineIdx = -1;
+        private int lockedTimelineIdx = -1;
+
         // UI Styles
         private GUIStyle headerStyle;
         private GUIStyle tableHeaderStyle;
@@ -105,17 +124,81 @@ namespace KSPPhysProfiler
 
         private void Awake()
         {
-            float fullW = 1000f;
-            float fullH = 680f;
-            fullWindowRect = new Rect((Screen.width - fullW) / 2f, (Screen.height - fullH) / 2f, fullW, fullH);
+            LoadWindowConfig();
+
+            whitePixelTex = new Texture2D(1, 1);
+            whitePixelTex.SetPixel(0, 0, Color.white);
+            whitePixelTex.Apply();
+        }
+
+        private void OnDisable()
+        {
+            SaveWindowConfig();
+        }
+
+        private void OnDestroy()
+        {
+            SaveWindowConfig();
+        }
+
+        private void LoadWindowConfig()
+        {
+            float defaultW = Mathf.Clamp(1020f, MIN_WINDOW_WIDTH, Screen.width - 20f);
+            float defaultH = Mathf.Clamp(700f, MIN_WINDOW_HEIGHT, Screen.height - 40f);
+            float defaultX = (Screen.width - defaultW) / 2f;
+            float defaultY = (Screen.height - defaultH) / 2f;
+            fullWindowRect = new Rect(defaultX, defaultY, defaultW, defaultH);
 
             float miniW = 360f;
             float miniH = 180f;
             miniWindowRect = new Rect(Screen.width - miniW - 20f, 60f, miniW, miniH);
 
-            whitePixelTex = new Texture2D(1, 1);
-            whitePixelTex.SetPixel(0, 0, Color.white);
-            whitePixelTex.Apply();
+            try
+            {
+                string dir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData/KSPPhysProfiler/PluginData");
+                string file = Path.Combine(dir, "window_layout.cfg");
+                if (File.Exists(file))
+                {
+                    string[] lines = File.ReadAllLines(file);
+                    float x = defaultX, y = defaultY, w = defaultW, h = defaultH;
+                    foreach (var line in lines)
+                    {
+                        if (string.IsNullOrEmpty(line) || line.StartsWith("#") || line.StartsWith("//")) continue;
+                        var parts = line.Split('=');
+                        if (parts.Length != 2) continue;
+                        string k = parts[0].Trim();
+                        string v = parts[1].Trim();
+                        if (k.Equals("WindowWidth", StringComparison.OrdinalIgnoreCase) && float.TryParse(v, out float vw)) w = vw;
+                        else if (k.Equals("WindowHeight", StringComparison.OrdinalIgnoreCase) && float.TryParse(v, out float vh)) h = vh;
+                        else if (k.Equals("WindowX", StringComparison.OrdinalIgnoreCase) && float.TryParse(v, out float vx)) x = vx;
+                        else if (k.Equals("WindowY", StringComparison.OrdinalIgnoreCase) && float.TryParse(v, out float vy)) y = vy;
+                    }
+
+                    w = Mathf.Clamp(w, MIN_WINDOW_WIDTH, Screen.width - 20f);
+                    h = Mathf.Clamp(h, MIN_WINDOW_HEIGHT, Screen.height - 40f);
+                    x = Mathf.Clamp(x, 0f, Screen.width - w);
+                    y = Mathf.Clamp(y, 0f, Screen.height - h);
+                    fullWindowRect = new Rect(x, y, w, h);
+                }
+            }
+            catch { }
+        }
+
+        private void SaveWindowConfig()
+        {
+            try
+            {
+                string dir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData/KSPPhysProfiler/PluginData");
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                string file = Path.Combine(dir, "window_layout.cfg");
+                string content = $"// KSPPhysProfiler Window Layout\n" +
+                                 $"WindowWidth = {fullWindowRect.width:F0}\n" +
+                                 $"WindowHeight = {fullWindowRect.height:F0}\n" +
+                                 $"WindowX = {fullWindowRect.x:F0}\n" +
+                                 $"WindowY = {fullWindowRect.y:F0}\n";
+                File.WriteAllText(file, content);
+            }
+            catch { }
         }
 
         private void OnGUI()
@@ -128,6 +211,27 @@ namespace KSPPhysProfiler
             }
 
             InitStyles();
+
+            // Handle window resizing globally across the entire screen
+            Event e = Event.current;
+            if (isResizing)
+            {
+                if (e.type == EventType.MouseDrag)
+                {
+                    Vector2 curMouse = GUIUtility.GUIToScreenPoint(e.mousePosition);
+                    float newW = Mathf.Clamp(resizeStartSize.x + (curMouse.x - resizeStartMouse.x), MIN_WINDOW_WIDTH, Screen.width - 20f);
+                    float newH = Mathf.Clamp(resizeStartSize.y + (curMouse.y - resizeStartMouse.y), MIN_WINDOW_HEIGHT, Screen.height - 40f);
+                    fullWindowRect.width = newW;
+                    fullWindowRect.height = newH;
+                    e.Use();
+                }
+                else if (e.rawType == EventType.MouseUp || e.type == EventType.MouseUp)
+                {
+                    isResizing = false;
+                    SaveWindowConfig();
+                    e.Use();
+                }
+            }
 
             if (IsMiniHud)
             {
@@ -217,6 +321,14 @@ namespace KSPPhysProfiler
                 padding = new RectOffset(6, 6, 2, 2)
             };
 
+            resizeGripStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 16,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.LowerRight,
+                padding = new RectOffset(0, 2, 0, 2)
+            };
+
             stylesInitialized = true;
         }
 
@@ -279,7 +391,38 @@ namespace KSPPhysProfiler
             }
 
             GUILayout.EndVertical();
-            GUI.DragWindow();
+
+            // Bottom-right corner resize grip handle
+            DrawWindowResizeGrip();
+
+            if (!isResizing)
+            {
+                // Drag window everywhere except the bottom 24px and corner
+                GUI.DragWindow(new Rect(0, 0, fullWindowRect.width, fullWindowRect.height - 24f));
+            }
+        }
+
+        private void DrawWindowResizeGrip()
+        {
+            Rect gripRect = new Rect(fullWindowRect.width - RESIZE_HANDLE_SIZE, fullWindowRect.height - RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
+            Event curEvt = Event.current;
+
+            if (curEvt.type == EventType.MouseDown && curEvt.button == 0 && gripRect.Contains(curEvt.mousePosition))
+            {
+                isResizing = true;
+                resizeStartMouse = GUIUtility.GUIToScreenPoint(curEvt.mousePosition);
+                resizeStartSize = new Vector2(fullWindowRect.width, fullWindowRect.height);
+                curEvt.Use();
+            }
+
+            // Visual corner grip
+            Color prevCol = GUI.color;
+            bool isHovered = gripRect.Contains(curEvt.mousePosition);
+            GUI.color = isResizing ? new Color(0.2f, 0.9f, 0.5f, 1f) :
+                        (isHovered ? new Color(1f, 0.85f, 0.3f, 1f) : new Color(0.6f, 0.65f, 0.75f, 0.65f));
+
+            GUI.Label(gripRect, "◢", resizeGripStyle);
+            GUI.color = prevCol;
         }
 
         private void DrawHeaderHUD()
@@ -311,6 +454,11 @@ namespace KSPPhysProfiler
             GUILayout.Label($"<b>{ProfilerI18n.Get("metric_total_frame")}:</b> {ProfilerData.SmoothTotalFrameMs:F1}ms (<color={jitterColor}>{jitter:F1}ms</color>)", headerStyle, GUILayout.Width(170));
 
             GUILayout.FlexibleSpace();
+
+            // Window size indicator
+            string sizeText = ProfilerI18n.Format("window_size_info", fullWindowRect.width, fullWindowRect.height);
+            GUILayout.Label(sizeText, tipStyle, GUILayout.Width(80));
+            GUILayout.Space(4);
 
             // Toggle Profiling button
             string toggleText = ProfilerData.IsEnabled ? ProfilerI18n.Get("enabled") : ProfilerI18n.Get("disabled");
@@ -471,7 +619,7 @@ namespace KSPPhysProfiler
             float pGpu = (float)(gpuMs / totalMs);
             float pOverhead = (float)(overheadMs / totalMs);
 
-            Rect barRect = GUILayoutUtility.GetRect(960, 10);
+            Rect barRect = GUILayoutUtility.GetRect(0, 10, GUILayout.ExpandWidth(true));
             GUI.Box(barRect, "");
 
             float currentX = barRect.x + 1;
@@ -540,7 +688,7 @@ namespace KSPPhysProfiler
 
         private void DrawDashboardTab()
         {
-            scrollPosGraph = GUILayout.BeginScrollView(scrollPosGraph);
+            scrollPosGraph = GUILayout.BeginScrollView(scrollPosGraph, false, false, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
             GUILayout.BeginVertical();
 
             // 1. Spike Sniffer (Hero Stutter Inspector - 置顶杀手级抓拍)
@@ -548,7 +696,7 @@ namespace KSPPhysProfiler
 
             GUILayout.Space(4);
 
-            // 2. Timeline Waveform Graph (彻底修复横向重叠)
+            // 2. Interactive Timeline Waveform Graph (自适应与交互式)
             DrawTimelineGraphCard();
 
             GUILayout.EndVertical();
@@ -574,11 +722,47 @@ namespace KSPPhysProfiler
             }
             GUILayout.EndHorizontal();
 
-            // Controls Toolbar Row 2: Legend on left, Time Span buttons on right (NO OVERLAP!)
+            // Controls Toolbar Row 2: Interactive Legend on left, Time Span buttons on right
             GUILayout.BeginHorizontal();
             if (graphMode == 0)
             {
-                GUILayout.Label($"<color=#33ff55>―</color> 60FPS  <color=#00d2d3>■</color> {ProfilerI18n.Get("legend_modules")}  <color=#a29bfe>■</color> {ProfilerI18n.Get("legend_plugins")}  <color=#ff9f43>■</color> {ProfilerI18n.Get("legend_physx")}  <color=#feca57>■</color> {ProfilerI18n.Get("legend_gpu")}  <color=#ff5555>▼</color> 尖峰", tipStyle);
+                // Clickable Layer Filter Pills
+                string modPill = showLayerModules ? "<color=#00d2d3>■</color>" : "<color=#555555>□</color>";
+                if (GUILayout.Button($"{modPill} {ProfilerI18n.Get("legend_modules")}", tipStyle))
+                {
+                    showLayerModules = !showLayerModules;
+                }
+                GUILayout.Space(6);
+
+                string plugPill = showLayerPlugins ? "<color=#a29bfe>■</color>" : "<color=#555555>□</color>";
+                if (GUILayout.Button($"{plugPill} {ProfilerI18n.Get("legend_plugins")}", tipStyle))
+                {
+                    showLayerPlugins = !showLayerPlugins;
+                }
+                GUILayout.Space(6);
+
+                string physxPill = showLayerPhysx ? "<color=#ff9f43>■</color>" : "<color=#555555>□</color>";
+                if (GUILayout.Button($"{physxPill} {ProfilerI18n.Get("legend_physx")}", tipStyle))
+                {
+                    showLayerPhysx = !showLayerPhysx;
+                }
+                GUILayout.Space(6);
+
+                string gpuPill = showLayerGpu ? "<color=#feca57>■</color>" : "<color=#555555>□</color>";
+                if (GUILayout.Button($"{gpuPill} {ProfilerI18n.Get("legend_gpu")}", tipStyle))
+                {
+                    showLayerGpu = !showLayerGpu;
+                }
+                GUILayout.Space(6);
+
+                string ovhPill = showLayerOverhead ? "<color=#8395a7>■</color>" : "<color=#555555>□</color>";
+                if (GUILayout.Button($"{ovhPill} {ProfilerI18n.Get("legend_overhead")}", tipStyle))
+                {
+                    showLayerOverhead = !showLayerOverhead;
+                }
+
+                GUILayout.Space(8);
+                GUILayout.Label("<color=#ff5555>▼</color> 尖峰", tipStyle);
             }
             else
             {
@@ -602,20 +786,56 @@ namespace KSPPhysProfiler
             }
             GUILayout.EndHorizontal();
 
-            // Graph Canvas
-            Rect graphRect = GUILayoutUtility.GetRect(960, 185);
+            // Graph Canvas (Fluid Width)
+            Rect graphRect = GUILayoutUtility.GetRect(0, 195, GUILayout.ExpandWidth(true));
             GUI.Box(graphRect, "");
 
             var timeline = ProfilerData.GetTimelineSample(graphTimeRange);
 
             if (timeline != null && timeline.Count > 1)
             {
-                float innerW = graphRect.width - 24;
+                float axisW = 65f;
+                float innerW = graphRect.width - 24 - axisW;
                 float innerH = graphRect.height - 24;
                 float innerX = graphRect.x + 12;
                 float innerY = graphRect.y + 12;
+                float axisX = innerX + innerW + 4;
 
                 Event currentEvt = Event.current;
+                Vector2 mousePos = currentEvt.mousePosition;
+                bool mouseInChart = new Rect(innerX, innerY, innerW, innerH).Contains(mousePos);
+                float barWidth = innerW / timeline.Count;
+
+                // Mouse Hover & Click Detection
+                if (mouseInChart && timeline.Count > 0)
+                {
+                    float relX = mousePos.x - innerX;
+                    int curHover = Mathf.Clamp((int)(relX / barWidth), 0, timeline.Count - 1);
+                    hoveredTimelineIdx = curHover;
+
+                    if (currentEvt.type == EventType.MouseDown && currentEvt.button == 0)
+                    {
+                        if (lockedTimelineIdx == curHover)
+                        {
+                            lockedTimelineIdx = -1; // unlock
+                        }
+                        else
+                        {
+                            lockedTimelineIdx = curHover; // lock
+                            if (timeline.IsSpike[curHover])
+                            {
+                                int sId = timeline.SpikeId[curHover];
+                                int foundIdx = ProfilerData.SpikeHistory.FindIndex(s => s.SpikeId == sId);
+                                if (foundIdx >= 0) selectedSpikeIndex = foundIdx;
+                            }
+                        }
+                        currentEvt.Use();
+                    }
+                }
+                else if (currentEvt.type == EventType.Repaint && lockedTimelineIdx < 0)
+                {
+                    hoveredTimelineIdx = -1;
+                }
 
                 if (graphMode == 0)
                 {
@@ -627,25 +847,37 @@ namespace KSPPhysProfiler
                     }
                     float maxMs = Mathf.Clamp((float)peakMs * 1.15f, 40f, 160f);
 
-                    // Guidelines
+                    // Guidelines across innerW
                     float y60 = innerY + innerH - ((16.67f / maxMs) * innerH);
                     float y30 = innerY + innerH - ((33.33f / maxMs) * innerH);
                     float y20 = innerY + innerH - ((50.0f / maxMs) * innerH);
 
                     // 60 FPS (Green)
-                    GUI.color = new Color(0.2f, 0.9f, 0.35f, 0.35f);
-                    GUI.DrawTexture(new Rect(innerX, y60, innerW, 1.5f), whitePixelTex);
+                    if (y60 >= innerY && y60 <= innerY + innerH)
+                    {
+                        GUI.color = new Color(0.2f, 0.9f, 0.35f, 0.35f);
+                        GUI.DrawTexture(new Rect(innerX, y60, innerW, 1.5f), whitePixelTex);
+                        GUI.Label(new Rect(axisX, y60 - 8, axisW, 16), $"<color=#33ff55>{ProfilerI18n.Get("graph_axis_60")}</color>", tipStyle);
+                    }
 
                     // 30 FPS (Orange)
-                    GUI.color = new Color(1f, 0.65f, 0.2f, 0.35f);
-                    GUI.DrawTexture(new Rect(innerX, y30, innerW, 1.5f), whitePixelTex);
+                    if (y30 >= innerY && y30 <= innerY + innerH)
+                    {
+                        GUI.color = new Color(1f, 0.65f, 0.2f, 0.35f);
+                        GUI.DrawTexture(new Rect(innerX, y30, innerW, 1.5f), whitePixelTex);
+                        GUI.Label(new Rect(axisX, y30 - 8, axisW, 16), $"<color=#ffaa22>{ProfilerI18n.Get("graph_axis_30")}</color>", tipStyle);
+                    }
 
                     // 20 FPS (Red)
-                    if (y20 >= innerY)
+                    if (y20 >= innerY && y20 <= innerY + innerH)
                     {
                         GUI.color = new Color(1f, 0.3f, 0.3f, 0.35f);
                         GUI.DrawTexture(new Rect(innerX, y20, innerW, 1.5f), whitePixelTex);
+                        GUI.Label(new Rect(axisX, y20 - 8, axisW, 16), $"<color=#ff5555>{ProfilerI18n.Get("graph_axis_20")}</color>", tipStyle);
                     }
+
+                    // Top Peak label
+                    GUI.Label(new Rect(axisX, innerY - 4, axisW, 16), $"<color=#888888>{maxMs:F0}ms</color>", tipStyle);
 
                     // Stack colors
                     Color colMod = new Color(0f, 0.82f, 0.83f, 0.95f);       // Cyan
@@ -654,8 +886,6 @@ namespace KSPPhysProfiler
                     Color colGpu = new Color(1f, 0.8f, 0.34f, 0.95f);        // Gold
                     Color colOverhead = new Color(0.51f, 0.58f, 0.65f, 0.85f); // Slate
 
-                    float barWidth = innerW / timeline.Count;
-
                     for (int i = 0; i < timeline.Count; i++)
                     {
                         float xPos = innerX + (i * barWidth);
@@ -663,7 +893,7 @@ namespace KSPPhysProfiler
                         float w = Math.Max(1.0f, barWidth - (timeline.Count > 200 ? 0f : 0.5f));
 
                         // 1. PartModules
-                        float hMod = Mathf.Clamp((float)(timeline.ModulesMs[i] / maxMs) * innerH, 0f, innerH);
+                        float hMod = showLayerModules ? Mathf.Clamp((float)(timeline.ModulesMs[i] / maxMs) * innerH, 0f, innerH) : 0f;
                         currentY -= hMod;
                         if (hMod > 0.5f)
                         {
@@ -672,7 +902,7 @@ namespace KSPPhysProfiler
                         }
 
                         // 2. Plugins
-                        float hPlugin = Mathf.Clamp((float)(timeline.PluginsMs[i] / maxMs) * innerH, 0f, innerH);
+                        float hPlugin = showLayerPlugins ? Mathf.Clamp((float)(timeline.PluginsMs[i] / maxMs) * innerH, 0f, innerH) : 0f;
                         currentY -= hPlugin;
                         if (hPlugin > 0.5f)
                         {
@@ -681,7 +911,7 @@ namespace KSPPhysProfiler
                         }
 
                         // 3. PhysX
-                        float hPhysx = Mathf.Clamp((float)(timeline.PhysXMs[i] / maxMs) * innerH, 0f, innerH);
+                        float hPhysx = showLayerPhysx ? Mathf.Clamp((float)(timeline.PhysXMs[i] / maxMs) * innerH, 0f, innerH) : 0f;
                         currentY -= hPhysx;
                         if (hPhysx > 0.5f)
                         {
@@ -690,7 +920,7 @@ namespace KSPPhysProfiler
                         }
 
                         // 4. GPU / Render
-                        float hGpu = Mathf.Clamp((float)(timeline.GpuMs[i] / maxMs) * innerH, 0f, innerH);
+                        float hGpu = showLayerGpu ? Mathf.Clamp((float)(timeline.GpuMs[i] / maxMs) * innerH, 0f, innerH) : 0f;
                         currentY -= hGpu;
                         if (hGpu > 0.5f)
                         {
@@ -699,7 +929,7 @@ namespace KSPPhysProfiler
                         }
 
                         // 5. Overhead
-                        float hOverhead = Mathf.Clamp((float)(timeline.OverheadMs[i] / maxMs) * innerH, 0f, innerH);
+                        float hOverhead = showLayerOverhead ? Mathf.Clamp((float)(timeline.OverheadMs[i] / maxMs) * innerH, 0f, innerH) : 0f;
                         currentY -= hOverhead;
                         if (hOverhead > 0.5f)
                         {
@@ -713,15 +943,6 @@ namespace KSPPhysProfiler
                             GUI.color = new Color(1f, 0.2f, 0.2f, 1f);
                             Rect markerRect = new Rect(xPos - 3, innerY - 2, 12, 14);
                             GUI.Label(markerRect, "▼", headerStyle);
-
-                            // Click on column to inspect this spike
-                            if (currentEvt.type == EventType.MouseDown && new Rect(xPos - 2, innerY, barWidth + 4, innerH).Contains(currentEvt.mousePosition))
-                            {
-                                int sId = timeline.SpikeId[i];
-                                int foundIdx = ProfilerData.SpikeHistory.FindIndex(s => s.SpikeId == sId);
-                                if (foundIdx >= 0) selectedSpikeIndex = foundIdx;
-                                currentEvt.Use();
-                            }
                         }
                     }
                     GUI.color = Color.white;
@@ -736,12 +957,12 @@ namespace KSPPhysProfiler
                     // 60 FPS Target (Green)
                     GUI.color = new Color(0.2f, 0.9f, 0.35f, 0.35f);
                     GUI.DrawTexture(new Rect(innerX, y60, innerW, 1.5f), whitePixelTex);
+                    GUI.Label(new Rect(axisX, y60 - 8, axisW, 16), "<color=#33ff55>60 FPS</color>", tipStyle);
 
                     // 30 FPS Minimum (Orange)
                     GUI.color = new Color(1f, 0.65f, 0.2f, 0.35f);
                     GUI.DrawTexture(new Rect(innerX, y30, innerW, 1.5f), whitePixelTex);
-
-                    float barWidth = innerW / timeline.Count;
+                    GUI.Label(new Rect(axisX, y30 - 8, axisW, 16), "<color=#ffaa22>30 FPS</color>", tipStyle);
 
                     for (int i = 0; i < timeline.Count; i++)
                     {
@@ -773,20 +994,91 @@ namespace KSPPhysProfiler
                     }
                     GUI.color = Color.white;
                 }
+
+                // Interactive Crosshair & Column Highlight
+                int activeInspect = lockedTimelineIdx >= 0 ? lockedTimelineIdx : hoveredTimelineIdx;
+                if (activeInspect >= 0 && activeInspect < timeline.Count)
+                {
+                    float colX = innerX + (activeInspect * barWidth);
+
+                    // Glowing column highlight
+                    Color colBg = lockedTimelineIdx >= 0 ? new Color(1f, 0.85f, 0.2f, 0.22f) : new Color(0.2f, 0.9f, 1f, 0.14f);
+                    GUI.color = colBg;
+                    GUI.DrawTexture(new Rect(colX, innerY, barWidth, innerH), whitePixelTex);
+
+                    // Luminous vertical cursor crosshair
+                    Color lineCol = lockedTimelineIdx >= 0 ? new Color(1f, 0.85f, 0.2f, 0.9f) : new Color(0.2f, 0.9f, 1f, 0.75f);
+                    GUI.color = lineCol;
+                    GUI.DrawTexture(new Rect(colX + (barWidth * 0.5f) - 0.75f, innerY, 1.5f, innerH), whitePixelTex);
+                    GUI.color = Color.white;
+                }
             }
 
-            // Phase Breakdown Sub-card
+            // Phase Breakdown Sub-card / Interactive Frame Inspection HUD
             GUILayout.Space(4);
-            GUILayout.BeginHorizontal("box");
-            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_physx")}:</b> {ProfilerData.SmoothPhysicsStepMs:F2} ms", tipStyle, GUILayout.Width(190));
-            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_camera")}:</b> {ProfilerData.CameraRenderMs:F2} ms", tipStyle, GUILayout.Width(190));
-            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_modules")}:</b> {ProfilerData.SmoothModuleScriptMs:F2} ms", tipStyle, GUILayout.Width(190));
-            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_plugins")}:</b> {ProfilerData.SmoothPluginScriptMs:F2} ms", tipStyle, GUILayout.Width(190));
-            if (ProfilerData.IsTUFXDetected)
+            int curInspect = lockedTimelineIdx >= 0 ? lockedTimelineIdx : hoveredTimelineIdx;
+
+            if (curInspect >= 0 && timeline != null && curInspect < timeline.Count)
             {
-                GUILayout.Label($"<b><color=#00e5ff>TUFX:</color></b> {ProfilerData.TUFXPostProcessMs:F2} ms", tipStyle, GUILayout.Width(180));
+                double hTotal = Math.Max(0.001, timeline.TotalMs[curInspect]);
+                double hFps = timeline.Fps[curInspect];
+                double hMod = timeline.ModulesMs[curInspect];
+                double hPlugin = timeline.PluginsMs[curInspect];
+                double hPhysx = timeline.PhysXMs[curInspect];
+                double hGpu = timeline.GpuMs[curInspect];
+                double hOverhead = timeline.OverheadMs[curInspect];
+                bool hSpike = timeline.IsSpike[curInspect];
+                int framesAgo = timeline.Count - 1 - curInspect;
+
+                Color prevBg = GUI.backgroundColor;
+                if (lockedTimelineIdx >= 0) GUI.backgroundColor = new Color(0.35f, 0.3f, 0.15f, 1f);
+                else GUI.backgroundColor = new Color(0.15f, 0.25f, 0.35f, 1f);
+
+                GUILayout.BeginHorizontal("box");
+
+                string lockTag = lockedTimelineIdx >= 0 ? ProfilerI18n.Get("graph_hover_locked") : ProfilerI18n.Get("graph_hover_tracking");
+                GUILayout.Label($"{lockTag} <b>-{framesAgo} 帧</b> ({hTotal:F1}ms, {hFps:F1} FPS)", headerStyle, GUILayout.Width(220));
+
+                GUILayout.Label($"<color=#00d2d3>■</color> 模块: {hMod:F1}ms ({(hMod / hTotal * 100):F0}%)", tipStyle);
+                GUILayout.Label($"<color=#a29bfe>■</color> 插件: {hPlugin:F1}ms ({(hPlugin / hTotal * 100):F0}%)", tipStyle);
+                GUILayout.Label($"<color=#ff9f43>■</color> 物理: {hPhysx:F1}ms ({(hPhysx / hTotal * 100):F0}%)", tipStyle);
+                GUILayout.Label($"<color=#feca57>■</color> GPU: {hGpu:F1}ms ({(hGpu / hTotal * 100):F0}%)", tipStyle);
+                GUILayout.Label($"<color=#8395a7>■</color> 调度: {hOverhead:F1}ms ({(hOverhead / hTotal * 100):F0}%)", tipStyle);
+
+                if (hSpike)
+                {
+                    GUILayout.Label($"<color=#ff3333><b>{ProfilerI18n.Get("graph_hover_spike_tag")}</b></color>", headerStyle);
+                }
+
+                GUILayout.FlexibleSpace();
+
+                if (lockedTimelineIdx >= 0)
+                {
+                    if (GUILayout.Button(ProfilerI18n.Get("graph_unlock_btn"), GUILayout.Width(75), GUILayout.Height(20)))
+                    {
+                        lockedTimelineIdx = -1;
+                    }
+                }
+
+                GUILayout.EndHorizontal();
+                GUI.backgroundColor = prevBg;
             }
-            GUILayout.EndHorizontal();
+            else
+            {
+                // Standard summary bar when no frame is hovered
+                GUILayout.BeginHorizontal("box");
+                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_physx")}:</b> {ProfilerData.SmoothPhysicsStepMs:F2} ms", tipStyle, GUILayout.Width(190));
+                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_camera")}:</b> {ProfilerData.CameraRenderMs:F2} ms", tipStyle, GUILayout.Width(190));
+                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_modules")}:</b> {ProfilerData.SmoothModuleScriptMs:F2} ms", tipStyle, GUILayout.Width(190));
+                GUILayout.Label($"<b>{ProfilerI18n.Get("metric_plugins")}:</b> {ProfilerData.SmoothPluginScriptMs:F2} ms", tipStyle, GUILayout.Width(190));
+                if (ProfilerData.IsTUFXDetected)
+                {
+                    GUILayout.Label($"<b><color=#00e5ff>TUFX:</color></b> {ProfilerData.TUFXPostProcessMs:F2} ms", tipStyle, GUILayout.Width(180));
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.Label("<color=#888888>(鼠标悬停图表可检视单帧微秒级构成)</color>", tipStyle);
+                GUILayout.EndHorizontal();
+            }
 
             GUILayout.EndVertical();
         }
@@ -989,7 +1281,7 @@ namespace KSPPhysProfiler
 
             // Table Header with Sortable Buttons
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(GetHeaderTitle("col_plugin_class", 0, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.Width(350)))
+            if (GUILayout.Button(GetHeaderTitle("col_plugin_class", 0, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
             {
                 ToggleSort(0, ref sortPluginsCol, ref sortPluginsAsc);
             }
@@ -1015,7 +1307,7 @@ namespace KSPPhysProfiler
             }
             GUILayout.EndHorizontal();
 
-            scrollPosPlugins = GUILayout.BeginScrollView(scrollPosPlugins);
+            scrollPosPlugins = GUILayout.BeginScrollView(scrollPosPlugins, false, false, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
             float now = Time.realtimeSinceStartup;
             bool sortChanged = searchPlugins != lastSearchPlugins ||
@@ -1050,7 +1342,7 @@ namespace KSPPhysProfiler
                 string expIcon = p.Methods.Count > 0 ? (isExp ? "▼ " : "▶ ") : "  ";
 
                 GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
-                if (GUILayout.Button(expIcon + displayTitle, headerStyle, GUILayout.Width(350)))
+                if (GUILayout.Button(expIcon + displayTitle, headerStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
                 {
                     if (p.Methods.Count > 0)
                     {
@@ -1079,7 +1371,7 @@ namespace KSPPhysProfiler
                         string mColor = meth.DisplayMs > 2.0 ? "#FF5555" : (meth.DisplayMs > 0.5 ? "#FFBB33" : "#88BBDD");
                         GUILayout.BeginHorizontal();
                         GUILayout.Space(24);
-                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.Width(326));
+                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.MinWidth(216), GUILayout.ExpandWidth(true));
 
                         GUILayout.BeginHorizontal(GUILayout.Width(110));
                         GUILayout.Label($"{meth.DisplayMs:F2} ms", GUILayout.Width(62));
@@ -1130,7 +1422,7 @@ namespace KSPPhysProfiler
 
             // Table Header with Sortable Buttons
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(GetHeaderTitle("col_module_type", 0, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.Width(350)))
+            if (GUILayout.Button(GetHeaderTitle("col_module_type", 0, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
             {
                 ToggleSort(0, ref sortModulesCol, ref sortModulesAsc);
             }
@@ -1156,7 +1448,7 @@ namespace KSPPhysProfiler
             }
             GUILayout.EndHorizontal();
 
-            scrollPosModules = GUILayout.BeginScrollView(scrollPosModules);
+            scrollPosModules = GUILayout.BeginScrollView(scrollPosModules, false, false, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
             float now = Time.realtimeSinceStartup;
             bool sortChanged = searchModules != lastSearchModules ||
@@ -1188,7 +1480,7 @@ namespace KSPPhysProfiler
                 string expIcon = m.Methods.Count > 0 ? (isExp ? "▼ " : "▶ ") : "  ";
 
                 GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
-                if (GUILayout.Button($"{expIcon}<color={colorStr}>{m.TypeName}</color>", headerStyle, GUILayout.Width(350)))
+                if (GUILayout.Button($"{expIcon}<color={colorStr}>{m.TypeName}</color>", headerStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
                 {
                     if (m.Methods.Count > 0)
                     {
@@ -1217,7 +1509,7 @@ namespace KSPPhysProfiler
                         string mColor = meth.DisplayMs > 2.0 ? "#FF5555" : (meth.DisplayMs > 0.5 ? "#FFBB33" : "#88BBDD");
                         GUILayout.BeginHorizontal();
                         GUILayout.Space(24);
-                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.Width(326));
+                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.MinWidth(216), GUILayout.ExpandWidth(true));
 
                         GUILayout.BeginHorizontal(GUILayout.Width(110));
                         GUILayout.Label($"{meth.DisplayMs:F2} ms", GUILayout.Width(62));
@@ -1273,7 +1565,7 @@ namespace KSPPhysProfiler
 
             // Table Header with Sortable Buttons
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(GetHeaderTitle("col_part_title", 0, sortPartsCol, sortPartsAsc), tableHeaderBtnStyle, GUILayout.Width(460)))
+            if (GUILayout.Button(GetHeaderTitle("col_part_title", 0, sortPartsCol, sortPartsAsc), tableHeaderBtnStyle, GUILayout.MinWidth(280), GUILayout.ExpandWidth(true)))
             {
                 ToggleSort(0, ref sortPartsCol, ref sortPartsAsc);
             }
@@ -1287,7 +1579,7 @@ namespace KSPPhysProfiler
             }
             GUILayout.EndHorizontal();
 
-            scrollPosParts = GUILayout.BeginScrollView(scrollPosParts);
+            scrollPosParts = GUILayout.BeginScrollView(scrollPosParts, false, false, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
             float now = Time.realtimeSinceStartup;
             bool sortChanged = searchParts != lastSearchParts ||
@@ -1314,7 +1606,7 @@ namespace KSPPhysProfiler
                 string colorStr = p.DisplayMs > 2.0 ? "#FF4444" : (p.DisplayMs > 0.8 ? "#FFAA22" : "#FFFFFF");
 
                 GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
-                GUILayout.Label($"<color={colorStr}>{p.PartTitle}</color>", headerStyle, GUILayout.Width(460));
+                GUILayout.Label($"<color={colorStr}>{p.PartTitle}</color>", headerStyle, GUILayout.MinWidth(280), GUILayout.ExpandWidth(true));
                 GUILayout.Label(p.VesselName, GUILayout.Width(320));
 
                 GUILayout.BeginHorizontal(GUILayout.Width(160));
@@ -1382,7 +1674,7 @@ namespace KSPPhysProfiler
 
             // === Assembly Distribution Bar ===
             GUILayout.Label($"<b>{ProfilerI18n.Get("asm_bar_title")}</b>", headerStyle);
-            Rect barRect = GUILayoutUtility.GetRect(960, 16);
+            Rect barRect = GUILayoutUtility.GetRect(0, 16, GUILayout.ExpandWidth(true));
             GUI.Box(barRect, "");
 
             float currentX = barRect.x + 2;
@@ -1458,7 +1750,7 @@ namespace KSPPhysProfiler
 
             // === Table Header ===
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(GetHeaderTitle("col_assembly_name", 0, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnStyle, GUILayout.Width(240)))
+            if (GUILayout.Button(GetHeaderTitle("col_assembly_name", 0, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
             {
                 ToggleSort(0, ref sortAssemblyCol, ref sortAssemblyAsc);
             }
@@ -1485,7 +1777,7 @@ namespace KSPPhysProfiler
             GUILayout.EndHorizontal();
 
             // === Scrollable Assembly Table ===
-            scrollPosAssembly = GUILayout.BeginScrollView(scrollPosAssembly);
+            scrollPosAssembly = GUILayout.BeginScrollView(scrollPosAssembly, false, false, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
             for (int i = 0; i < asmList.Count; i++)
             {
@@ -1498,7 +1790,7 @@ namespace KSPPhysProfiler
                 GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
 
                 // Clickable expand/collapse assembly name
-                if (GUILayout.Button($"{expandIcon} <color={colorStr}><b>{asm.AssemblyName}</b></color>", headerStyle, GUILayout.Width(240)))
+                if (GUILayout.Button($"{expandIcon} <color={colorStr}><b>{asm.AssemblyName}</b></color>", headerStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
                 {
                     if (isExpanded)
                         expandedAssemblies.Remove(asm.AssemblyName);
@@ -1536,7 +1828,7 @@ namespace KSPPhysProfiler
                         string nsDisplayName = ns.Namespace;
                         if (nsDisplayName.Length > 30) nsDisplayName = nsDisplayName.Substring(0, 27) + "...";
 
-                        if (GUILayout.Button($"{nsIcon} <color={nsColorStr}>{nsDisplayName}</color>", tipStyle, GUILayout.Width(220)))
+                        if (GUILayout.Button($"{nsIcon} <color={nsColorStr}>{nsDisplayName}</color>", tipStyle, GUILayout.MinWidth(220), GUILayout.ExpandWidth(true)))
                         {
                             if (nsExpanded)
                                 expandedNamespaces.Remove(nsKey);
@@ -1572,7 +1864,7 @@ namespace KSPPhysProfiler
 
                                     GUILayout.BeginHorizontal();
                                     GUILayout.Space(36);
-                                    if (GUILayout.Button($"<color={subColor}><b>{subIcon}{sub.DisplayName}</b></color>", tipStyle, GUILayout.Width(204)))
+                                    if (GUILayout.Button($"<color={subColor}><b>{subIcon}{sub.DisplayName}</b></color>", tipStyle, GUILayout.MinWidth(204), GUILayout.ExpandWidth(true)))
                                     {
                                         if (subExp) expandedSubsystems.Remove(subKey);
                                         else expandedSubsystems.Add(subKey);
@@ -1635,7 +1927,7 @@ namespace KSPPhysProfiler
             GUILayout.Space(indent);
 
             int nameWidth = Math.Max(120, 240 - indent);
-            if (GUILayout.Button($"<color={tColorStr}>{typeIcon}{t.TypeName}</color>", tipStyle, GUILayout.Width(nameWidth)))
+            if (GUILayout.Button($"<color={tColorStr}>{typeIcon}{t.TypeName}</color>", tipStyle, GUILayout.MinWidth(nameWidth), GUILayout.ExpandWidth(true)))
             {
                 if (hasMethods)
                 {
@@ -1672,7 +1964,7 @@ namespace KSPPhysProfiler
                     GUILayout.Space(indent + 16);
 
                     int methWidth = Math.Max(100, 240 - indent - 16);
-                    if (GUILayout.Button($"<color={mColor}>{methIcon}{meth.MethodName}()</color>", tipStyle, GUILayout.Width(methWidth)))
+                    if (GUILayout.Button($"<color={mColor}>{methIcon}{meth.MethodName}()</color>", tipStyle, GUILayout.MinWidth(methWidth), GUILayout.ExpandWidth(true)))
                     {
                         if (hasSubs)
                         {
@@ -1705,7 +1997,7 @@ namespace KSPPhysProfiler
 
                             string subDisplay = $"⚡ <color=#00e5ff>[{sub.AssemblyName}]</color> {sub.TypeName}.{sub.MethodName}";
                             int subWidth = Math.Max(140, 360 - indent - 32);
-                            GUILayout.Label($"<color={sColor}>{subDisplay}</color>", tipStyle, GUILayout.Width(subWidth));
+                            GUILayout.Label($"<color={sColor}>{subDisplay}</color>", tipStyle, GUILayout.MinWidth(subWidth), GUILayout.ExpandWidth(true));
 
                             GUILayout.BeginHorizontal(GUILayout.Width(110));
                             GUILayout.Label($"{sub.DisplayMs:F2} ms", GUILayout.Width(62));
@@ -1728,7 +2020,7 @@ namespace KSPPhysProfiler
         private void DrawSettingsAndHelpTab()
         {
             GUILayout.BeginVertical(cardStyle);
-            scrollPosHelp = GUILayout.BeginScrollView(scrollPosHelp);
+            scrollPosHelp = GUILayout.BeginScrollView(scrollPosHelp, false, false, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
             // Section 1: Quick Maintenance Actions Card
             GUILayout.BeginVertical("box");
