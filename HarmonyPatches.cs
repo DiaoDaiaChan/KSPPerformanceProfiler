@@ -131,7 +131,7 @@ namespace KSPPerformanceProfiler
 
         private static void PartModule_Prefix(out long __state)
         {
-            __state = ProfilerData.IsEnabled ? Stopwatch.GetTimestamp() : 0;
+            __state = (ProfilerData.IsEnabled && !ProfilerData.IsFrozen) ? Stopwatch.GetTimestamp() : 0;
         }
 
         private static void PartModule_Postfix(PartModule __instance, MethodBase __originalMethod, long __state)
@@ -150,7 +150,7 @@ namespace KSPPerformanceProfiler
 
         private static void Plugin_Prefix(out long __state)
         {
-            __state = ProfilerData.IsEnabled ? Stopwatch.GetTimestamp() : 0;
+            __state = (ProfilerData.IsEnabled && !ProfilerData.IsFrozen) ? Stopwatch.GetTimestamp() : 0;
         }
 
         private static void Plugin_Postfix(MonoBehaviour __instance, MethodBase __originalMethod, long __state)
@@ -178,7 +178,7 @@ namespace KSPPerformanceProfiler
 
         private static bool TimingDispatcher_Prefix(MonoBehaviour __instance, MethodBase __originalMethod)
         {
-            if (!ProfilerData.IsEnabled || __instance == null || __originalMethod == null) return true;
+            if (!ProfilerData.IsEnabled || ProfilerData.IsFrozen || __instance == null || __originalMethod == null) return true;
 
             string methodName = __originalMethod.Name;
             string propName = methodName == "FixedUpdate" ? "onFixedUpdate" : (methodName == "Update" ? "onUpdate" : "onLateUpdate");

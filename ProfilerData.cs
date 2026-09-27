@@ -479,6 +479,20 @@ namespace KSPPerformanceProfiler
         public static void ToggleFreeze()
         {
             IsFrozen = !IsFrozen;
+            if (!IsFrozen) ResetAllFrameAccumulators();
+        }
+
+        /// <summary>
+        /// Drains all per-frame tick accumulators to zero.
+        /// Must be called when unfreezing to prevent stale accumulated ticks
+        /// from the frozen period from contaminating the first live frame's PeakMs.
+        /// </summary>
+        public static void ResetAllFrameAccumulators()
+        {
+            foreach (var m in moduleStatsMap.Values) m.ResetFrame();
+            foreach (var p in pluginStatsMap.Values) p.ResetFrame();
+            foreach (var pt in partStatsMap.Values) pt.ResetFrame();
+            physFrameElapsedTicks = 0;
         }
 
         // Macro Timings (Instantaneous & Smoothed)
@@ -964,7 +978,7 @@ namespace KSPPerformanceProfiler
 
         public static void RecordModuleExecution(PartModule module, string methodName, long elapsedTicks)
         {
-            if (!IsEnabled || module == null) return;
+            if (!IsEnabled || IsFrozen || module == null) return;
             Type mType = module.GetType();
             if (!moduleStatsMap.TryGetValue(mType, out ModuleStats mStats))
             {
@@ -998,7 +1012,7 @@ namespace KSPPerformanceProfiler
 
         public static void RecordPluginExecution(MonoBehaviour plugin, string methodName, long elapsedTicks)
         {
-            if (!IsEnabled || plugin == null) return;
+            if (!IsEnabled || IsFrozen || plugin == null) return;
             Type pType = plugin.GetType();
             if (!pluginStatsMap.TryGetValue(pType, out ModuleStats pStats))
             {
@@ -1020,7 +1034,7 @@ namespace KSPPerformanceProfiler
 
         public static void RecordDispatcherSubInvocation(Type dispatcherType, string methodName, System.Reflection.MethodInfo targetMethod, long elapsedTicks)
         {
-            if (!IsEnabled || dispatcherType == null || targetMethod == null) return;
+            if (!IsEnabled || IsFrozen || dispatcherType == null || targetMethod == null) return;
             if (!pluginStatsMap.TryGetValue(dispatcherType, out ModuleStats pStats))
             {
                 pStats = new ModuleStats(dispatcherType);

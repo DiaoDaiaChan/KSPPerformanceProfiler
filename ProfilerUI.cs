@@ -694,6 +694,7 @@ namespace KSPPerformanceProfiler
                 if (GUILayout.Button($"<b>{ProfilerI18n.Get("hero_unfreeze_btn")}</b>", GUILayout.Width(130), GUILayout.Height(23)))
                 {
                     ProfilerData.IsFrozen = false;
+                    ProfilerData.ResetAllFrameAccumulators();
                 }
                 GUI.backgroundColor = prevCol;
                 GUILayout.Space(6);
