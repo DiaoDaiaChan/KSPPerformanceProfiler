@@ -153,7 +153,8 @@ namespace KSPPerformanceProfiler
                 TargetPadMb = targetMegaBytes;
                 SaveConfig();
 
-                int chunksCount = Math.Max(1, (targetMegaBytes * 1024 * 1024) / CHUNK_SIZE);
+                int chunkSizeMb = CHUNK_SIZE / (1024 * 1024); // 16
+                int chunksCount = Math.Max(1, targetMegaBytes / chunkSizeMb);
 
                 // If already padded with this exact amount, keep it
                 if (padBlocks != null && padBlocks.Length == chunksCount)
