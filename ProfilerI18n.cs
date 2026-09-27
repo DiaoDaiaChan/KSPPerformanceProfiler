@@ -565,9 +565,7 @@ namespace KSPPerformanceProfiler
 
             if (CurrentPackIndex == -1)
             {
-                var pack = GetActiveLanguagePack();
-                string activeName = pack != null ? pack.Name : "Auto";
-                return $"🌐 {activeName} ▾";
+                return "🌐 Language ▾";
             }
 
             if (CurrentPackIndex >= 0 && CurrentPackIndex < AvailablePacks.Count)
@@ -575,7 +573,7 @@ namespace KSPPerformanceProfiler
                 return $"🌐 {AvailablePacks[CurrentPackIndex].Name} ▾";
             }
 
-            return "🌐 Lang ▾";
+            return "🌐 Language ▾";
         }
     }
 }
