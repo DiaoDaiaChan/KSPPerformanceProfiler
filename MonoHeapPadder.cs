@@ -76,7 +76,19 @@ namespace KSPPerformanceProfiler
                 int ram = SystemRamMb;
                 if (ram >= 30000) return 4096;
                 if (ram >= 14000) return 2048;
-                return 1024;
+                if (ram >= 7000) return 1024;
+                return 512;
+            }
+        }
+
+        public static int MaxSafePadMb
+        {
+            get
+            {
+                int ram = SystemRamMb;
+                int max75 = (int)(ram * 0.75);
+                int maxReserve4Gb = Math.Max(512, ram - 4096);
+                return Math.Min(max75, maxReserve4Gb);
             }
         }
 

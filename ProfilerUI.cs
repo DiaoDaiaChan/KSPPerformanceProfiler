@@ -107,6 +107,10 @@ namespace KSPPerformanceProfiler
         private int hoveredTimelineIdx = -1;
         private int lockedTimelineIdx = -1;
 
+        // Custom Heap Padding State
+        private string customPadMbInput = "";
+        private string padValidationMsg = "";
+
         // UI Styles
         private GUIStyle headerStyle;
         private GUIStyle tableHeaderStyle;
@@ -2109,61 +2113,162 @@ namespace KSPPerformanceProfiler
             GUILayout.Label(ProfilerI18n.Get("pad_card_desc"), tipStyle);
             GUILayout.Space(4);
 
+            // Machine Physical RAM Banner & Intelligent Recommendation
+            int ramMb = MonoHeapPadder.SystemRamMb;
+            int ramGb = Math.Max(1, (int)Math.Round(ramMb / 1024.0));
+            int recMb = MonoHeapPadder.RecommendedPadMb;
+            int recGb = Math.Max(1, recMb / 1024);
+            int maxSafeMb = MonoHeapPadder.MaxSafePadMb;
+
+            GUILayout.BeginVertical("box");
+            GUILayout.Label(ProfilerI18n.Format("pad_ram_banner", ramGb, ramMb, recMb, recGb, maxSafeMb), headerStyle);
+            GUILayout.Label(ProfilerI18n.Get("pad_ram_tip"), tipStyle);
+            GUILayout.EndVertical();
+            GUILayout.Space(4);
+
             // Realtime heap status display
             double heapMb = MonoHeapPadder.CurrentHeapMb;
             double usedMb = MonoHeapPadder.GameUsedMb;
             double padMb = MonoHeapPadder.PaddedMb;
             double freeMb = MonoHeapPadder.CurrentFreeMb;
-            int ramGb = Math.Max(1, MonoHeapPadder.SystemRamMb / 1024);
             string freeColor = (freeMb >= 800.0 || padMb >= 1000.0) ? "#33FF33" : (freeMb >= 300.0 ? "#FFFF33" : "#FF3333");
             
             GUILayout.Label(ProfilerI18n.Format("pad_heap_stat", heapMb, usedMb, freeColor, freeMb, ramGb, padMb), headerStyle);
             GUILayout.Space(6);
 
-            // Presets and Buttons
+            // Row 1: Presets & One-click Recommendation
             GUILayout.BeginHorizontal();
+            GUILayout.Label("<b>预设梯度:</b>", tipStyle, GUILayout.Width(65));
 
-            int[] presets = new int[] { 2048, 4096, 6144 };
+            int[] presets = new int[] { 1024, 2048, 4096, 6144 };
             for (int i = 0; i < presets.Length; i++)
             {
                 int mb = presets[i];
+                if (mb > maxSafeMb && maxSafeMb > 1024) continue;
                 bool isCurrent = MonoHeapPadder.TargetPadMb == mb && MonoHeapPadder.IsPadded;
                 Color prevBg = GUI.backgroundColor;
                 if (isCurrent) GUI.backgroundColor = new Color(0.2f, 0.9f, 0.5f, 1f);
 
                 string btnText = ProfilerI18n.Format("pad_btn_preset", mb, mb / 1024);
-                if (GUILayout.Button(btnText, GUILayout.Width(160), GUILayout.Height(25)))
+                if (GUILayout.Button(btnText, GUILayout.Width(135), GUILayout.Height(25)))
                 {
                     MonoHeapPadder.TargetPadMb = mb;
+                    customPadMbInput = mb.ToString();
+                    padValidationMsg = "";
                     MonoHeapPadder.Pad(mb);
                 }
                 GUI.backgroundColor = prevBg;
                 GUILayout.Space(4);
             }
 
-            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_btn_apply")}</b>", GUILayout.Width(120), GUILayout.Height(25)))
+            // Quick Apply Recommended Value
+            Color prevBgRec = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.3f, 0.85f, 0.95f, 1f);
+            if (GUILayout.Button(ProfilerI18n.Format("pad_btn_use_rec", recMb), GUILayout.Width(170), GUILayout.Height(25)))
             {
-                MonoHeapPadder.Pad(MonoHeapPadder.TargetPadMb);
+                MonoHeapPadder.TargetPadMb = recMb;
+                customPadMbInput = recMb.ToString();
+                padValidationMsg = "";
+                MonoHeapPadder.Pad(recMb);
+            }
+            GUI.backgroundColor = prevBgRec;
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(6);
+
+            // Row 2: Manual Custom Value Input with Quick Steppers
+            if (string.IsNullOrEmpty(customPadMbInput))
+            {
+                customPadMbInput = (MonoHeapPadder.TargetPadMb > 0 ? MonoHeapPadder.TargetPadMb : recMb).ToString();
             }
 
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"<b>{ProfilerI18n.Get("pad_custom_label")}</b>", tipStyle, GUILayout.Width(155));
+
+            if (GUILayout.Button("-1024", GUILayout.Width(50), GUILayout.Height(24)))
+            {
+                if (int.TryParse(customPadMbInput, out int curVal))
+                {
+                    customPadMbInput = Math.Max(256, curVal - 1024).ToString();
+                }
+            }
+            if (GUILayout.Button("-512", GUILayout.Width(45), GUILayout.Height(24)))
+            {
+                if (int.TryParse(customPadMbInput, out int curVal))
+                {
+                    customPadMbInput = Math.Max(256, curVal - 512).ToString();
+                }
+            }
+
+            customPadMbInput = GUILayout.TextField(customPadMbInput, GUILayout.Width(75), GUILayout.Height(24));
+
+            if (GUILayout.Button("+512", GUILayout.Width(45), GUILayout.Height(24)))
+            {
+                if (int.TryParse(customPadMbInput, out int curVal))
+                {
+                    customPadMbInput = Math.Min(maxSafeMb, curVal + 512).ToString();
+                }
+            }
+            if (GUILayout.Button("+1024", GUILayout.Width(50), GUILayout.Height(24)))
+            {
+                if (int.TryParse(customPadMbInput, out int curVal))
+                {
+                    customPadMbInput = Math.Min(maxSafeMb, curVal + 1024).ToString();
+                }
+            }
+
+            GUILayout.Space(6);
+
+            // Apply Custom Value Button
+            Color prevBgApply = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.2f, 0.9f, 0.5f, 1f);
+            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_custom_apply")}</b>", GUILayout.Width(150), GUILayout.Height(25)))
+            {
+                if (int.TryParse(customPadMbInput, out int val) && val >= 256 && val <= maxSafeMb)
+                {
+                    padValidationMsg = "";
+                    MonoHeapPadder.TargetPadMb = val;
+                    MonoHeapPadder.Pad(val);
+                }
+                else
+                {
+                    padValidationMsg = ProfilerI18n.Format("pad_custom_err_range", maxSafeMb);
+                }
+            }
+            GUI.backgroundColor = prevBgApply;
+
+            GUILayout.Space(6);
+
+            // Release Padding Button (if active)
             if (MonoHeapPadder.IsPadded)
             {
                 Color prevBgRel = GUI.backgroundColor;
                 GUI.backgroundColor = new Color(1f, 0.5f, 0.3f, 1f);
-                if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_btn_release")}</b>", GUILayout.Width(110), GUILayout.Height(25)))
+                if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_btn_release")}</b>", GUILayout.Width(100), GUILayout.Height(25)))
                 {
                     MonoHeapPadder.ReleasePadding();
                 }
                 GUI.backgroundColor = prevBgRel;
+                GUILayout.Space(6);
             }
 
-            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_force_gc")}</b>", GUILayout.Width(250), GUILayout.Height(25)))
+            // Force GC Button
+            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_force_gc")}</b>", GUILayout.Width(220), GUILayout.Height(25)))
             {
                 MonoHeapPadder.ForceGarbageCollection();
             }
 
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
+
+            // Validation warning line if input out of bounds
+            if (!string.IsNullOrEmpty(padValidationMsg))
+            {
+                GUILayout.Space(2);
+                GUILayout.Label($"<color=#ff5555>⚠️ {padValidationMsg}</color>", tipStyle);
+            }
 
             GUILayout.Space(6);
 
