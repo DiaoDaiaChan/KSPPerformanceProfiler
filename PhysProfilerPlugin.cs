@@ -4,7 +4,7 @@ using System.IO;
 using KSP.UI.Screens;
 using UnityEngine;
 
-namespace KSPPhysProfiler
+namespace KSPPerformanceProfiler
 {
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public class PhysProfilerPlugin : MonoBehaviour
@@ -25,7 +25,7 @@ namespace KSPPhysProfiler
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            UnityEngine.Debug.Log("[KSPPhysProfiler] Plugin Initializing...");
+            UnityEngine.Debug.Log("[KSPPerformanceProfiler] Plugin Initializing...");
             HarmonyPatches.ApplyPatches();
 
             if (gameObject.GetComponent<ProfilerUI>() == null)
@@ -121,7 +121,7 @@ namespace KSPPhysProfiler
             {
                 ToggleUI();
                 ScreenMessages.PostScreenMessage(
-                    $"[KSPPhysProfiler] {(isUiVisible ? ProfilerI18n.Get("msg_ui_opened") : ProfilerI18n.Get("msg_ui_closed"))}",
+                    $"[KSPPerformanceProfiler] {(isUiVisible ? ProfilerI18n.Get("msg_ui_opened") : ProfilerI18n.Get("msg_ui_closed"))}",
                     1.5f,
                     ScreenMessageStyle.LOWER_CENTER
                 );
@@ -139,7 +139,7 @@ namespace KSPPhysProfiler
                 }
 
                 ScreenMessages.PostScreenMessage(
-                    $"[KSPPhysProfiler] {(ProfilerUI.IsMiniHud ? ProfilerI18n.Get("msg_hud_opened") : ProfilerI18n.Get("msg_ui_opened"))}",
+                    $"[KSPPerformanceProfiler] {(ProfilerUI.IsMiniHud ? ProfilerI18n.Get("msg_hud_opened") : ProfilerI18n.Get("msg_ui_opened"))}",
                     1.5f,
                     ScreenMessageStyle.LOWER_CENTER
                 );
@@ -246,7 +246,7 @@ namespace KSPPhysProfiler
         {
             try
             {
-                string iconPath = Path.Combine(KSPUtil.ApplicationRootPath, "GameData", "KSPPhysProfiler", "Icons", "icon.png");
+                string iconPath = Path.Combine(KSPUtil.ApplicationRootPath, "GameData", "KSPPerformanceProfiler", "Icons", "icon.png");
                 if (File.Exists(iconPath))
                 {
                     byte[] data = File.ReadAllBytes(iconPath);
@@ -260,7 +260,7 @@ namespace KSPPhysProfiler
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogWarning($"[KSPPhysProfiler] Failed to load icon from disk: {ex.Message}. Falling back to procedural icon.");
+                UnityEngine.Debug.LogWarning($"[KSPPerformanceProfiler] Failed to load icon from disk: {ex.Message}. Falling back to procedural icon.");
             }
 
             return CreateDefaultIcon();
@@ -307,7 +307,7 @@ namespace KSPPhysProfiler
         {
             try
             {
-                string logDir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData", "KSPPhysProfiler", "Logs");
+                string logDir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData", "KSPPerformanceProfiler", "Logs");
                 if (!Directory.Exists(logDir))
                 {
                     Directory.CreateDirectory(logDir);
@@ -320,11 +320,11 @@ namespace KSPPhysProfiler
 
                 string successMsg = string.Format(ProfilerI18n.Get("msg_report_saved"), fileName);
                 ScreenMessages.PostScreenMessage(successMsg, 5.0f, ScreenMessageStyle.UPPER_CENTER);
-                UnityEngine.Debug.Log($"[KSPPhysProfiler] Saved report to {filePath}");
+                UnityEngine.Debug.Log($"[KSPPerformanceProfiler] Saved report to {filePath}");
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogError($"[KSPPhysProfiler] Failed to save report: {ex}");
+                UnityEngine.Debug.LogError($"[KSPPerformanceProfiler] Failed to save report: {ex}");
                 string failMsg = string.Format(ProfilerI18n.Get("msg_report_fail"), ex.Message);
                 ScreenMessages.PostScreenMessage(failMsg, 5.0f, ScreenMessageStyle.UPPER_CENTER);
             }

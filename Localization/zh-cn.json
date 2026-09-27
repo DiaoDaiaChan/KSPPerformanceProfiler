@@ -2,9 +2,9 @@
   "LanguageCode": "zh-cn",
   "LanguageName": "简体中文",
   "Author": "DiaoDaiaChan",
-  "Description": "KSPPhysProfiler 简体中文官方语言包",
+  "Description": "KSPPerformanceProfiler 简体中文官方语言包",
   "Translations": {
-    "app_title": "KSP 底层性能与物理瓶颈分析器 (KSPPhysProfiler)",
+    "app_title": "KSP 底层性能与物理瓶颈分析器 (KSPPerformanceProfiler)",
     "app_mini_title": "性能监控 HUD",
     "enabled": "已启用监控",
     "disabled": "已暂停监控",
@@ -150,7 +150,7 @@
     "help_mod_tuning_q": "常见 Mod 优化建议：",
     "help_mod_tuning_a": "1. 物理卡顿：使用 KSPCommunityFixes，减少每艘飞船上的自动刚化数量。\n2. 内存与 GC 卡顿：使用本 Mod 内置的【Mono 堆内存垫高器】(快捷键 Alt+End) 将虚拟堆垫高 2~4GB，即可将 GC 卡顿由几秒一次大幅延长至数十分钟一次。\n3. GPU 渲染卡顿：调低 TUFX / Scatterer 的阴影和抗锯齿倍率，关闭不必要的屏幕空间反射。",
 
-    "msg_report_saved": "性能诊断报告已成功保存至:\nGameData/KSPPhysProfiler/Logs/{0}",
+    "msg_report_saved": "性能诊断报告已成功保存至:\nGameData/KSPPerformanceProfiler/Logs/{0}",
     "msg_report_fail": "保存性能报告失败: {0}",
     "msg_ui_opened": "已打开性能分析器窗口",
     "msg_ui_closed": "已关闭性能分析器窗口",
@@ -211,7 +211,7 @@
     "pad_status_warn": "🟡 堆内存缓冲较小 (空闲仅 {0:F0} MB，容易频繁触发 GC 停顿，建议垫高)",
     "pad_hero_advice": "检测到 GC 停顿引发卡顿！当前空闲缓冲不足。建议点击右侧【一键垫高堆内存】彻底消除 GC 刺客！",
     "pad_hero_btn": "⚡ 一键垫高堆内存",
-    "pad_msg_gc_freed": "[KSPPhysProfiler] 🧹 GC 手动回收完成！释放了约 {0} MB 托管内存 (当前空闲: {1:F0} MB)",
+    "pad_msg_gc_freed": "[KSPPerformanceProfiler] 🧹 GC 手动回收完成！释放了约 {0} MB 托管内存 (当前空闲: {1:F0} MB)",
 
     "graph_unlock_btn": "✕ 解锁",
     "graph_hover_locked": "🔒 [已锁定检视]",

@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Text;
 using UnityEngine;
 
-namespace KSPPhysProfiler
+namespace KSPPerformanceProfiler
 {
     public class LanguagePack
     {
@@ -249,7 +249,7 @@ namespace KSPPhysProfiler
             List<string> searchDirs = new List<string>();
             try
             {
-                string rootDir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData", "KSPPhysProfiler", "Localization");
+                string rootDir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData", "KSPPerformanceProfiler", "Localization");
                 if (Directory.Exists(rootDir)) searchDirs.Add(rootDir);
             }
             catch { }
@@ -295,7 +295,7 @@ namespace KSPPhysProfiler
                         }
                         catch (Exception ex)
                         {
-                            UnityEngine.Debug.LogError($"[KSPPhysProfiler] Failed to load language pack from {file}: {ex.Message}");
+                            UnityEngine.Debug.LogError($"[KSPPerformanceProfiler] Failed to load language pack from {file}: {ex.Message}");
                         }
                     }
                 }
@@ -313,7 +313,7 @@ namespace KSPPhysProfiler
             });
 
             isInitialized = true;
-            UnityEngine.Debug.Log($"[KSPPhysProfiler] Loaded {AvailablePacks.Count} external language packs from disk.");
+            UnityEngine.Debug.Log($"[KSPPerformanceProfiler] Loaded {AvailablePacks.Count} external language packs from disk.");
         }
 
         private static LanguagePack ParseLanguagePack(string filePath, string json)

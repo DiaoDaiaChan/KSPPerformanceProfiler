@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-namespace KSPPhysProfiler
+namespace KSPPerformanceProfiler
 {
     public class SubInvocationStats
     {
@@ -1388,7 +1388,7 @@ namespace KSPPhysProfiler
             var diag = BottleneckDetector.Analyze();
 
             sb.AppendLine("================================================================================");
-            sb.AppendLine("              KSP LOW-LEVEL ENGINE & FPS PERFORMANCE DUMP (KSPPhysProfiler)     ");
+            sb.AppendLine("              KSP LOW-LEVEL ENGINE & FPS PERFORMANCE DUMP (KSPPerformanceProfiler)     ");
             sb.AppendLine("================================================================================");
             sb.AppendLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine($"PTR (Physics Time Ratio): {CurrentPTR * 100.0:F1}%");

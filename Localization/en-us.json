@@ -2,9 +2,9 @@
   "LanguageCode": "en-us",
   "LanguageName": "English",
   "Author": "DiaoDaiaChan",
-  "Description": "KSPPhysProfiler English official language pack",
+  "Description": "KSPPerformanceProfiler English official language pack",
   "Translations": {
-    "app_title": "KSP Low-Level Engine & Physics Profiler (KSPPhysProfiler)",
+    "app_title": "KSP Low-Level Engine & Physics Profiler (KSPPerformanceProfiler)",
     "app_mini_title": "Profiler HUD",
     "enabled": "Profile Enabled",
     "disabled": "Profile Paused",
@@ -150,7 +150,7 @@
     "help_mod_tuning_q": "Mod Optimization Tips:",
     "help_mod_tuning_a": "1. Physics Lag: Install KSPCommunityFixes and avoid excessive AutoStruts.\n2. GC Hitching: Use this mod's built-in [Mono Heap Padder] (Hotkey: Alt+End) to pad 2-4GB virtual heap, extending GC pause intervals from seconds to dozens of minutes.\n3. GPU Lag: Tweak Scatterer / TUFX antialiasing and Parallax terrain tessellation settings.",
 
-    "msg_report_saved": "Performance diagnostic report saved to:\nGameData/KSPPhysProfiler/Logs/{0}",
+    "msg_report_saved": "Performance diagnostic report saved to:\nGameData/KSPPerformanceProfiler/Logs/{0}",
     "msg_report_fail": "Failed to save performance report: {0}",
     "msg_ui_opened": "Performance Profiler window opened",
     "msg_ui_closed": "Performance Profiler window closed",
@@ -211,7 +211,7 @@
     "pad_status_warn": "🟡 Low Heap Headroom (Only {0:F0} MB free, frequent GC pauses likely, padding recommended)",
     "pad_hero_advice": "GC pause stutter detected! Free headroom is low. Click Quick Pad Heap to eliminate GC spikes!",
     "pad_hero_btn": "⚡ Quick Pad Heap",
-    "pad_msg_gc_freed": "[KSPPhysProfiler] 🧹 Manual GC complete! Reclaimed ~{0} MB managed memory (Current free: {1:F0} MB)",
+    "pad_msg_gc_freed": "[KSPPerformanceProfiler] 🧹 Manual GC complete! Reclaimed ~{0} MB managed memory (Current free: {1:F0} MB)",
 
     "graph_unlock_btn": "✕ Unlock",
     "graph_hover_locked": "🔒 [Locked Frame]",

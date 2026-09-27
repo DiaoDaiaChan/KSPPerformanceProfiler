@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace KSPPhysProfiler
+namespace KSPPerformanceProfiler
 {
     public enum BottleneckType
     {

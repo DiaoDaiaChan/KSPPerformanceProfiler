@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-namespace KSPPhysProfiler
+namespace KSPPerformanceProfiler
 {
     public class ProfilerUI : MonoBehaviour
     {
@@ -155,7 +155,7 @@ namespace KSPPhysProfiler
 
             try
             {
-                string dir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData/KSPPhysProfiler/PluginData");
+                string dir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData/KSPPerformanceProfiler/PluginData");
                 string file = Path.Combine(dir, "window_layout.cfg");
                 if (File.Exists(file))
                 {
@@ -188,10 +188,10 @@ namespace KSPPhysProfiler
         {
             try
             {
-                string dir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData/KSPPhysProfiler/PluginData");
+                string dir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData/KSPPerformanceProfiler/PluginData");
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
                 string file = Path.Combine(dir, "window_layout.cfg");
-                string content = $"// KSPPhysProfiler Window Layout\n" +
+                string content = $"// KSPPerformanceProfiler Window Layout\n" +
                                  $"WindowWidth = {fullWindowRect.width:F0}\n" +
                                  $"WindowHeight = {fullWindowRect.height:F0}\n" +
                                  $"WindowX = {fullWindowRect.x:F0}\n" +
@@ -445,7 +445,7 @@ namespace KSPPhysProfiler
 
             // Mod Brand & Status Dot
             string statusDot = ProfilerData.IsEnabled ? "<color=#33FF33>●</color>" : "<color=#888888>○</color>";
-            GUILayout.Label($"{statusDot} <b>KSPPhysProfiler</b>", headerStyle, GUILayout.Width(140));
+            GUILayout.Label($"{statusDot} <b>KSPPerformanceProfiler</b>", headerStyle, GUILayout.Width(140));
 
             // Core Telemetry Badges
             GUILayout.Label($"<b>FPS:</b> <color={fpsColor}><b>{fps:F1}</b></color> (Avg: {avgFps:F1})", fpsStyle, GUILayout.Width(140));

@@ -3,7 +3,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Profiling;
 
-namespace KSPPhysProfiler
+namespace KSPPerformanceProfiler
 {
     /// <summary>
     /// Built-in Mono Heap Padder & GC Stutter Eliminator (Native Padheap)
@@ -76,7 +76,7 @@ namespace KSPPhysProfiler
 
             try
             {
-                string dir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData/KSPPhysProfiler/PluginData");
+                string dir = Path.Combine(KSPUtil.ApplicationRootPath, "GameData/KSPPerformanceProfiler/PluginData");
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
                 configFilePath = Path.Combine(dir, "padheap.cfg");
                 LoadConfig();
@@ -90,7 +90,7 @@ namespace KSPPhysProfiler
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogWarning($"[KSPPhysProfiler] MonoHeapPadder init warning: {ex.Message}");
+                UnityEngine.Debug.LogWarning($"[KSPPerformanceProfiler] MonoHeapPadder init warning: {ex.Message}");
             }
         }
 
@@ -133,7 +133,7 @@ namespace KSPPhysProfiler
                     if (!silent)
                     {
                         ScreenMessages.PostScreenMessage(
-                            $"[KSPPhysProfiler] {LastStatusMessage}",
+                            $"[KSPPerformanceProfiler] {LastStatusMessage}",
                             3.5f,
                             ScreenMessageStyle.UPPER_CENTER
                         );
@@ -165,12 +165,12 @@ namespace KSPPhysProfiler
                 LastPadTime = DateTime.Now;
                 LastStatusMessage = ProfilerI18n.Format("pad_status_success", (int)CurrentHeapMb, (int)CurrentFreeMb);
 
-                UnityEngine.Debug.Log($"[KSPPhysProfiler] MonoHeapPadder: Heap successfully expanded to {CurrentHeapMb:F0} MB (Free headroom: {CurrentFreeMb:F0} MB).");
+                UnityEngine.Debug.Log($"[KSPPerformanceProfiler] MonoHeapPadder: Heap successfully expanded to {CurrentHeapMb:F0} MB (Free headroom: {CurrentFreeMb:F0} MB).");
 
                 if (!silent)
                 {
                     ScreenMessages.PostScreenMessage(
-                        $"[KSPPhysProfiler] 🚀 {LastStatusMessage}",
+                        $"[KSPPerformanceProfiler] 🚀 {LastStatusMessage}",
                         4.0f,
                         ScreenMessageStyle.UPPER_CENTER
                     );
@@ -181,7 +181,7 @@ namespace KSPPhysProfiler
             catch (Exception ex)
             {
                 LastStatusMessage = $"Pad heap error: {ex.Message}";
-                UnityEngine.Debug.LogError($"[KSPPhysProfiler] MonoHeapPadder failed: {ex}");
+                UnityEngine.Debug.LogError($"[KSPPerformanceProfiler] MonoHeapPadder failed: {ex}");
                 return false;
             }
         }
@@ -238,7 +238,7 @@ namespace KSPPhysProfiler
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogWarning($"[KSPPhysProfiler] Load padheap.cfg warning: {ex.Message}");
+                UnityEngine.Debug.LogWarning($"[KSPPerformanceProfiler] Load padheap.cfg warning: {ex.Message}");
             }
         }
 
@@ -248,7 +248,7 @@ namespace KSPPhysProfiler
 
             try
             {
-                string content = $"// KSPPhysProfiler Native Mono Heap Padder Configuration\n" +
+                string content = $"// KSPPerformanceProfiler Native Mono Heap Padder Configuration\n" +
                                  $"TargetPadMb = {TargetPadMb}\n" +
                                  $"AutoPadOnSceneChange = {AutoPadOnSceneChange}\n" +
                                  $"EnableHotkey = {EnableHotkey}\n";

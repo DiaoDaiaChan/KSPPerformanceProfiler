@@ -5,7 +5,7 @@ using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
-namespace KSPPhysProfiler
+namespace KSPPerformanceProfiler
 {
     public static class HarmonyPatches
     {
@@ -19,7 +19,7 @@ namespace KSPPhysProfiler
 
             try
             {
-                harmonyInstance = new Harmony("com.kspphysprofiler.patch");
+                harmonyInstance = new Harmony("com.kspperformanceprofiler.patch");
 
                 MethodInfo prefixModule = typeof(HarmonyPatches).GetMethod(nameof(PartModule_Prefix), BindingFlags.Static | BindingFlags.NonPublic);
                 MethodInfo postfixModule = typeof(HarmonyPatches).GetMethod(nameof(PartModule_Postfix), BindingFlags.Static | BindingFlags.NonPublic);
@@ -45,7 +45,7 @@ namespace KSPPhysProfiler
                 foreach (Assembly assembly in assemblies)
                 {
                     string name = assembly.GetName().Name;
-                    if (name.StartsWith("System") || name.StartsWith("UnityEngine") || name.StartsWith("mscorlib") || name.StartsWith("Mono.") || name == "KSPPhysProfiler")
+                    if (name.StartsWith("System") || name.StartsWith("UnityEngine") || name.StartsWith("mscorlib") || name.StartsWith("Mono.") || name == "KSPPerformanceProfiler")
                     {
                         continue;
                     }
@@ -119,11 +119,11 @@ namespace KSPPhysProfiler
 
                 PatchedModuleCount = moduleCount;
                 PatchedPluginCount = pluginCount;
-                UnityEngine.Debug.Log($"[KSPPhysProfiler] Patched {moduleCount} PartModule methods and {pluginCount} standalone Plugin methods!");
+                UnityEngine.Debug.Log($"[KSPPerformanceProfiler] Patched {moduleCount} PartModule methods and {pluginCount} standalone Plugin methods!");
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogError($"[KSPPhysProfiler] Failed to apply Harmony patches: {ex}");
+                UnityEngine.Debug.LogError($"[KSPPerformanceProfiler] Failed to apply Harmony patches: {ex}");
             }
         }
 
@@ -244,7 +244,7 @@ namespace KSPPhysProfiler
                 }
                 catch (Exception ex)
                 {
-                    UnityEngine.Debug.LogError($"[KSPPhysProfiler] Error in {t.Name}.{methodName} callback {targetMethod?.DeclaringType?.FullName}.{targetMethod?.Name}: {ex}");
+                    UnityEngine.Debug.LogError($"[KSPPerformanceProfiler] Error in {t.Name}.{methodName} callback {targetMethod?.DeclaringType?.FullName}.{targetMethod?.Name}: {ex}");
                 }
                 long itemElapsed = Stopwatch.GetTimestamp() - itemStart;
 
