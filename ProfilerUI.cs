@@ -114,6 +114,7 @@ namespace KSPPerformanceProfiler
         // Language Dropdown Popup State
         private bool showLanguageDropdown = false;
         private Rect langButtonRect;
+        private Vector2 langDropdownScroll;
 
         // UI Styles
         private GUIStyle headerStyle;
@@ -444,10 +445,15 @@ namespace KSPPerformanceProfiler
 
         private void DrawLanguageDropdownPopup()
         {
-            float menuW = 150f;
+            float menuW = 160f;
             float itemH = 24f;
             int totalItems = ProfilerI18n.AvailablePacks.Count + 1; // Auto + packs
-            float menuH = totalItems * itemH + 10f;
+            float idealMenuH = totalItems * itemH + 10f;
+
+            // Clamp menu to stay within window bounds
+            float maxMenuH = fullWindowRect.height - langButtonRect.yMax - 20f;
+            float menuH = Math.Min(idealMenuH, Math.Max(maxMenuH, itemH * 2 + 10f));
+            bool needsScroll = idealMenuH > menuH;
             Rect menuRect = new Rect(langButtonRect.x, langButtonRect.yMax + 2f, menuW, menuH);
 
             Event cur = Event.current;
@@ -464,6 +470,10 @@ namespace KSPPerformanceProfiler
             GUI.Box(menuRect, GUIContent.none, cardAccentStyle);
 
             GUILayout.BeginArea(new Rect(menuRect.x + 3f, menuRect.y + 4f, menuRect.width - 6f, menuRect.height - 8f));
+
+            if (needsScroll)
+                langDropdownScroll = GUILayout.BeginScrollView(langDropdownScroll, false, true);
+
             GUILayout.BeginVertical();
 
             // Auto Option
@@ -489,6 +499,10 @@ namespace KSPPerformanceProfiler
             }
 
             GUILayout.EndVertical();
+
+            if (needsScroll)
+                GUILayout.EndScrollView();
+
             GUILayout.EndArea();
         }
 
@@ -2194,21 +2208,53 @@ namespace KSPPerformanceProfiler
             GUILayout.EndHorizontal();
             GUILayout.Space(2);
 
-            string[] langOptions = new string[ProfilerI18n.AvailablePacks.Count + 1];
-            var activePack = ProfilerI18n.GetActiveLanguagePack();
-            langOptions[0] = ProfilerI18n.CurrentPackIndex == -1 && activePack != null
-                ? $"🌐 {ProfilerI18n.Get("lang_auto")} ({activePack.Name})"
-                : $"🌐 {ProfilerI18n.Get("lang_auto")}";
-            for (int i = 0; i < ProfilerI18n.AvailablePacks.Count; i++)
-            {
-                langOptions[i + 1] = ProfilerI18n.AvailablePacks[i].Name;
-            }
+            // Adaptive wrapping grid: auto-wrap language buttons to fit window width
+            float langBtnW = 120f;
+            float langBtnH = 26f;
+            float availW = fullWindowRect.width - 40f;
+            int colCount = Math.Max(1, (int)(availW / langBtnW));
 
-            int curSelected = ProfilerI18n.CurrentPackIndex + 1;
-            int newSelected = GUILayout.Toolbar(curSelected, langOptions, GUILayout.Height(26));
-            if (newSelected != curSelected)
+            // Build options: Auto + all packs
+            int totalLangItems = ProfilerI18n.AvailablePacks.Count + 1;
+            for (int row = 0; row * colCount < totalLangItems; row++)
             {
-                ProfilerI18n.CurrentPackIndex = newSelected - 1;
+                GUILayout.BeginHorizontal();
+                for (int col = 0; col < colCount; col++)
+                {
+                    int idx = row * colCount + col;
+                    if (idx >= totalLangItems)
+                    {
+                        GUILayout.FlexibleSpace();
+                        break;
+                    }
+
+                    bool isSelected;
+                    string label;
+
+                    if (idx == 0)
+                    {
+                        // Auto option
+                        isSelected = ProfilerI18n.CurrentPackIndex == -1;
+                        var autoActivePack = ProfilerI18n.GetActiveLanguagePack();
+                        label = isSelected && autoActivePack != null
+                            ? $"🌐 Auto ({autoActivePack.Name})"
+                            : $"🌐 {ProfilerI18n.Get("lang_auto")}";
+                    }
+                    else
+                    {
+                        int packIdx = idx - 1;
+                        isSelected = ProfilerI18n.CurrentPackIndex == packIdx;
+                        label = ProfilerI18n.AvailablePacks[packIdx].Name;
+                    }
+
+                    if (isSelected) label = "● " + label;
+                    GUIStyle btnStyle = isSelected ? tableHeaderBtnStyle : GUI.skin.button;
+                    if (GUILayout.Button(label, btnStyle, GUILayout.Width(langBtnW), GUILayout.Height(langBtnH)))
+                    {
+                        ProfilerI18n.CurrentPackIndex = idx == 0 ? -1 : idx - 1;
+                    }
+                }
+                GUILayout.EndHorizontal();
             }
             GUILayout.EndVertical();
 
