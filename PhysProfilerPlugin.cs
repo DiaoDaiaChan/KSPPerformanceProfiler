@@ -155,6 +155,7 @@ namespace KSPPerformanceProfiler
         private void OnLevelLoadedGUIReady(GameScenes scene)
         {
             MonoHeapPadder.OnSceneLoaded();
+            ProfilerI18n.ReloadLanguagePacks();
         }
 
         private void FixedUpdate()

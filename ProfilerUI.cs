@@ -2099,7 +2099,7 @@ namespace KSPPerformanceProfiler
             {
                 ProfilerData.ResetAllPeakData();
             }
-            if (GUILayout.Button($"🌐 {ProfilerI18n.GetCurrentLanguageButtonText()}", GUILayout.Width(160), GUILayout.Height(25)))
+            if (GUILayout.Button(ProfilerI18n.GetCurrentLanguageButtonText(), GUILayout.Width(170), GUILayout.Height(25)))
             {
                 ProfilerI18n.ToggleNextLanguage();
             }
@@ -2107,6 +2107,38 @@ namespace KSPPerformanceProfiler
             GUILayout.FlexibleSpace();
             GUILayout.Label(string.Format(ProfilerI18n.Get("patched_stats"), HarmonyPatches.PatchedModuleCount, HarmonyPatches.PatchedPluginCount), tipStyle);
             GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+
+            GUILayout.Space(6);
+
+            // Section 1.5: Dedicated Language Selection & Dynamic Hot-Reload Card
+            GUILayout.BeginVertical("box");
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"<b>🌐 {ProfilerI18n.Get("lang_label")} ({ProfilerI18n.AvailablePacks.Count})</b>", headerStyle);
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button(ProfilerI18n.IsChinese ? "🔄 重新扫描语言包" : "🔄 Reload Language Packs", GUILayout.Height(22)))
+            {
+                ProfilerI18n.ReloadLanguagePacks();
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Space(2);
+
+            string[] langOptions = new string[ProfilerI18n.AvailablePacks.Count + 1];
+            var activePack = ProfilerI18n.GetActiveLanguagePack();
+            langOptions[0] = ProfilerI18n.CurrentPackIndex == -1 && activePack != null
+                ? $"🌐 {ProfilerI18n.Get("lang_auto")} ({activePack.Name})"
+                : $"🌐 {ProfilerI18n.Get("lang_auto")}";
+            for (int i = 0; i < ProfilerI18n.AvailablePacks.Count; i++)
+            {
+                langOptions[i + 1] = ProfilerI18n.AvailablePacks[i].Name;
+            }
+
+            int curSelected = ProfilerI18n.CurrentPackIndex + 1;
+            int newSelected = GUILayout.Toolbar(curSelected, langOptions, GUILayout.Height(26));
+            if (newSelected != curSelected)
+            {
+                ProfilerI18n.CurrentPackIndex = newSelected - 1;
+            }
             GUILayout.EndVertical();
 
             GUILayout.Space(6);

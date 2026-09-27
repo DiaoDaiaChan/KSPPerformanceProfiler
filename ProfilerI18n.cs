@@ -243,6 +243,12 @@ namespace KSPPerformanceProfiler
 
         public static void ReloadLanguagePacks()
         {
+            string currentCode = null;
+            if (CurrentPackIndex >= 0 && CurrentPackIndex < AvailablePacks.Count)
+            {
+                currentCode = AvailablePacks[CurrentPackIndex].Code;
+            }
+
             AvailablePacks.Clear();
             baseEnglishPack = null;
 
@@ -302,15 +308,30 @@ namespace KSPPerformanceProfiler
                 catch { }
             }
 
-            // Sort order: zh-cn first, en-us second, then alphabetical
+            // Priority order: zh-cn, en-us, ru, es-es, de-de, ja, then alphabetical
+            var priorityMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "zh-cn", 0 },
+                { "en-us", 1 },
+                { "ru", 2 },
+                { "es-es", 3 },
+                { "de-de", 4 },
+                { "ja", 5 }
+            };
+
             AvailablePacks.Sort((a, b) =>
             {
-                if (a.Code.Equals("zh-cn", StringComparison.OrdinalIgnoreCase)) return -1;
-                if (b.Code.Equals("zh-cn", StringComparison.OrdinalIgnoreCase)) return 1;
-                if (a.Code.Equals("en-us", StringComparison.OrdinalIgnoreCase)) return -1;
-                if (b.Code.Equals("en-us", StringComparison.OrdinalIgnoreCase)) return 1;
+                int pA = priorityMap.TryGetValue(a.Code, out int valA) ? valA : 99;
+                int pB = priorityMap.TryGetValue(b.Code, out int valB) ? valB : 99;
+                if (pA != pB) return pA.CompareTo(pB);
                 return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
             });
+
+            if (!string.IsNullOrEmpty(currentCode))
+            {
+                int found = AvailablePacks.FindIndex(p => p.Code.Equals(currentCode, StringComparison.OrdinalIgnoreCase));
+                CurrentPackIndex = found >= 0 ? found : -1;
+            }
 
             isInitialized = true;
             UnityEngine.Debug.Log($"[KSPPerformanceProfiler] Loaded {AvailablePacks.Count} external language packs from disk.");
