@@ -146,14 +146,22 @@ try {
     $token = if ($env:GH_TOKEN) { $env:GH_TOKEN } else { $env:GITHUB_TOKEN }
 
     if ($gh) {
-        gh release view $Tag *> $null
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "    Release $Tag 已存在，改为上传/覆盖资源。"
-            gh release upload $Tag $ZipPath --clobber
-        } else {
-            gh release create $Tag $ZipPath --title "$ModName $Tag" --notes-file $notesPath
+        # gh 在「未找到 Release」时会向 stderr 输出，$ErrorActionPreference='Stop' 下会被当作终止错误，
+        # 这里临时放宽偏好，改用 $LASTEXITCODE 判定。
+        $prevPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            gh release view $Tag *> $null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "    Release $Tag 已存在，改为上传/覆盖资源。"
+                gh release upload $Tag $ZipPath --clobber
+            } else {
+                gh release create $Tag $ZipPath --title "$ModName $Tag" --notes-file $notesPath
+            }
+            if ($LASTEXITCODE -ne 0) { throw 'gh 发布 Release 失败。' }
+        } finally {
+            $ErrorActionPreference = $prevPreference
         }
-        if ($LASTEXITCODE -ne 0) { throw 'gh 发布 Release 失败。' }
     } elseif ($token) {
         $headers = @{
             Authorization = "Bearer $token"
