@@ -21,6 +21,12 @@ namespace KSPPerformanceProfiler
         private static bool isInitialized = false;
         private static string configFilePath = "";
 
+        // Permanent padding blocks - kept alive to prevent Mono from shrinking the heap
+        private static byte[][] padBlocks = null;
+        public static int PadBlockCount => padBlocks != null ? padBlocks.Length : 0;
+        public static long PadBlockTotalBytes => padBlocks != null ? (long)padBlocks.Length * CHUNK_SIZE : 0;
+        private const int CHUNK_SIZE = 16 * 1024 * 1024; // 16 MB per block
+
         public static double CurrentHeapMb
         {
             get
@@ -42,6 +48,16 @@ namespace KSPPerformanceProfiler
         public static double CurrentFreeMb
         {
             get { return Math.Max(0.0, CurrentHeapMb - CurrentUsedMb); }
+        }
+
+        public static double PaddedMb
+        {
+            get { return PadBlockTotalBytes / (1024.0 * 1024.0); }
+        }
+
+        public static double GameUsedMb
+        {
+            get { return Math.Max(0.0, CurrentUsedMb - PaddedMb); }
         }
 
         public static int SystemRamMb
@@ -66,7 +82,7 @@ namespace KSPPerformanceProfiler
 
         public static bool IsPadded
         {
-            get { return TargetPadMb > 0 && CurrentHeapMb >= (TargetPadMb * 0.85); }
+            get { return padBlocks != null && padBlocks.Length > 0; }
         }
 
         public static void Initialize()
@@ -83,7 +99,7 @@ namespace KSPPerformanceProfiler
 
                 TargetPadMb = Math.Max(1024, TargetPadMb == 0 ? RecommendedPadMb : TargetPadMb);
 
-                if (AutoPadOnSceneChange && CurrentHeapMb < (TargetPadMb * 0.85))
+                if (AutoPadOnSceneChange && !IsPadded)
                 {
                     Pad(TargetPadMb, silent: true);
                 }
@@ -98,15 +114,16 @@ namespace KSPPerformanceProfiler
         {
             if (!isInitialized) Initialize();
 
-            if (AutoPadOnSceneChange && TargetPadMb > 0 && CurrentHeapMb < (TargetPadMb * 0.85))
+            if (AutoPadOnSceneChange && TargetPadMb > 0 && !IsPadded)
             {
                 Pad(TargetPadMb, silent: true);
             }
         }
 
         /// <summary>
-        /// Expands the managed Mono virtual heap by allocating temporary memory blocks,
-        /// committing physical pages, and then releasing them to Mono's internal freelist.
+        /// Expands the managed Mono heap by allocating permanent memory blocks held in a static field.
+        /// Blocks are NEVER released to GC, ensuring the heap stays expanded permanently across any garbage collection.
+        /// This is the proven MemGraph/HeapPadder approach.
         /// </summary>
         public static bool Pad(int targetMegaBytes, bool silent = false)
         {
@@ -124,12 +141,12 @@ namespace KSPPerformanceProfiler
                 TargetPadMb = targetMegaBytes;
                 SaveConfig();
 
-                long curHeapBytes = Profiler.GetMonoHeapSizeLong();
-                long targetBytes = (long)targetMegaBytes * 1024L * 1024L;
+                int chunksCount = Math.Max(1, (targetMegaBytes * 1024 * 1024) / CHUNK_SIZE);
 
-                if (curHeapBytes >= targetBytes)
+                // If already padded with this exact amount, keep it
+                if (padBlocks != null && padBlocks.Length == chunksCount)
                 {
-                    LastStatusMessage = ProfilerI18n.Format("pad_status_success", (int)CurrentHeapMb, (int)CurrentFreeMb);
+                    LastStatusMessage = ProfilerI18n.Format("pad_status_success", CurrentHeapMb, PaddedMb);
                     if (!silent)
                     {
                         ScreenMessages.PostScreenMessage(
@@ -141,31 +158,25 @@ namespace KSPPerformanceProfiler
                     return true;
                 }
 
-                long bytesNeeded = targetBytes - curHeapBytes;
-                const int CHUNK_SIZE = 16 * 1024 * 1024; // 16 MB chunks
-                int chunksCount = (int)(bytesNeeded / CHUNK_SIZE) + 1;
-
-                // Allocate blocks to expand the OS virtual heap
-                byte[][] tempAlloc = new byte[chunksCount][];
-                for (int i = 0; i < chunksCount; i++)
-                {
-                    tempAlloc[i] = new byte[CHUNK_SIZE];
-                    // Touch first and last byte to commit pages into physical RAM
-                    tempAlloc[i][0] = 0x5A;
-                    tempAlloc[i][CHUNK_SIZE - 1] = 0xA5;
-                }
-
-                // Dereference temp arrays
-                tempAlloc = null;
-
-                // Single garbage collection to move newly committed pages into Mono's freelist
+                // If re-padding with different size, release previous blocks first
+                padBlocks = null;
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
 
-                LastPadTime = DateTime.Now;
-                LastStatusMessage = ProfilerI18n.Format("pad_status_success", (int)CurrentHeapMb, (int)CurrentFreeMb);
+                // Allocate blocks and KEEP them alive permanently in the static field
+                padBlocks = new byte[chunksCount][];
+                for (int i = 0; i < chunksCount; i++)
+                {
+                    padBlocks[i] = new byte[CHUNK_SIZE];
+                    // Touch first and last byte to commit pages into physical RAM
+                    padBlocks[i][0] = 0x5A;
+                    padBlocks[i][CHUNK_SIZE - 1] = 0xA5;
+                }
 
-                UnityEngine.Debug.Log($"[KSPPerformanceProfiler] MonoHeapPadder: Heap successfully expanded to {CurrentHeapMb:F0} MB (Free headroom: {CurrentFreeMb:F0} MB).");
+                LastPadTime = DateTime.Now;
+                LastStatusMessage = ProfilerI18n.Format("pad_status_success", CurrentHeapMb, PaddedMb);
+
+                UnityEngine.Debug.Log($"[KSPPerformanceProfiler] MonoHeapPadder: Heap padded with {chunksCount} x 16MB blocks ({chunksCount * 16} MB). Total heap: {CurrentHeapMb:F0} MB (Padded: {PaddedMb:F0} MB).");
 
                 if (!silent)
                 {
@@ -184,6 +195,27 @@ namespace KSPPerformanceProfiler
                 UnityEngine.Debug.LogError($"[KSPPerformanceProfiler] MonoHeapPadder failed: {ex}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Releases all padding blocks back to GC, allowing the heap to shrink on next collection.
+        /// </summary>
+        public static void ReleasePadding()
+        {
+            int blockCount = PadBlockCount;
+            long freedMb = PadBlockTotalBytes / (1024 * 1024);
+            padBlocks = null;
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            LastStatusMessage = ProfilerI18n.Format("pad_status_released", blockCount, freedMb);
+            UnityEngine.Debug.Log($"[KSPPerformanceProfiler] MonoHeapPadder: Released {blockCount} pad blocks ({freedMb} MB).");
+            ScreenMessages.PostScreenMessage(
+                $"[KSPPerformanceProfiler] {LastStatusMessage}",
+                3.5f,
+                ScreenMessageStyle.UPPER_CENTER
+            );
         }
 
         public static void ForceGarbageCollection()

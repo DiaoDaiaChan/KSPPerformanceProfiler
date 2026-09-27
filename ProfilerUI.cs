@@ -1122,12 +1122,14 @@ namespace KSPPerformanceProfiler
 
                 // Mono GC real-time stats
                 double heapMb = MonoHeapPadder.CurrentHeapMb;
+                double padMb = MonoHeapPadder.PaddedMb;
                 double freeMb = MonoHeapPadder.CurrentFreeMb;
-                string heapColor = freeMb >= 800.0 ? "#33FF33" : (freeMb >= 300.0 ? "#FFFF33" : "#FF3333");
+                string heapColor = (freeMb >= 800.0 || padMb >= 1000.0) ? "#33FF33" : (freeMb >= 300.0 ? "#FFFF33" : "#FF3333");
                 string gcRateStr = ProfilerData.GcCollectionsPerSec > 0.1
                     ? $"<color=#ff8800>{ProfilerData.GcCollectionsPerSec:F1}/s</color>"
                     : $"<color=#33FF33>0/s</color>";
-                GUILayout.Label($"<b>🗑️ Mono:</b> <color={heapColor}>{freeMb:F0}MB</color> GC: {gcRateStr}", tipStyle);
+                string padTag = padMb > 0 ? $"<color=#33FF33>[+{padMb:F0}MB]</color> " : "";
+                GUILayout.Label($"<b>🗑️ Mono:</b> {padTag}<color={heapColor}>{heapMb:F0}MB</color> GC: {gcRateStr}", tipStyle);
 
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
@@ -2109,12 +2111,13 @@ namespace KSPPerformanceProfiler
 
             // Realtime heap status display
             double heapMb = MonoHeapPadder.CurrentHeapMb;
-            double usedMb = MonoHeapPadder.CurrentUsedMb;
+            double usedMb = MonoHeapPadder.GameUsedMb;
+            double padMb = MonoHeapPadder.PaddedMb;
             double freeMb = MonoHeapPadder.CurrentFreeMb;
             int ramGb = Math.Max(1, MonoHeapPadder.SystemRamMb / 1024);
-            string freeColor = freeMb >= 800.0 ? "#33FF33" : (freeMb >= 300.0 ? "#FFFF33" : "#FF3333");
+            string freeColor = (freeMb >= 800.0 || padMb >= 1000.0) ? "#33FF33" : (freeMb >= 300.0 ? "#FFFF33" : "#FF3333");
             
-            GUILayout.Label(ProfilerI18n.Format("pad_heap_stat", heapMb, usedMb, freeColor, freeMb, ramGb), headerStyle);
+            GUILayout.Label(ProfilerI18n.Format("pad_heap_stat", heapMb, usedMb, freeColor, freeMb, ramGb, padMb), headerStyle);
             GUILayout.Space(6);
 
             // Presets and Buttons
@@ -2124,7 +2127,7 @@ namespace KSPPerformanceProfiler
             for (int i = 0; i < presets.Length; i++)
             {
                 int mb = presets[i];
-                bool isCurrent = MonoHeapPadder.TargetPadMb == mb;
+                bool isCurrent = MonoHeapPadder.TargetPadMb == mb && MonoHeapPadder.IsPadded;
                 Color prevBg = GUI.backgroundColor;
                 if (isCurrent) GUI.backgroundColor = new Color(0.2f, 0.9f, 0.5f, 1f);
 
@@ -2141,6 +2144,17 @@ namespace KSPPerformanceProfiler
             if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_btn_apply")}</b>", GUILayout.Width(120), GUILayout.Height(25)))
             {
                 MonoHeapPadder.Pad(MonoHeapPadder.TargetPadMb);
+            }
+
+            if (MonoHeapPadder.IsPadded)
+            {
+                Color prevBgRel = GUI.backgroundColor;
+                GUI.backgroundColor = new Color(1f, 0.5f, 0.3f, 1f);
+                if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_btn_release")}</b>", GUILayout.Width(110), GUILayout.Height(25)))
+                {
+                    MonoHeapPadder.ReleasePadding();
+                }
+                GUI.backgroundColor = prevBgRel;
             }
 
             if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_force_gc")}</b>", GUILayout.Width(250), GUILayout.Height(25)))
