@@ -111,6 +111,10 @@ namespace KSPPerformanceProfiler
         private string customPadMbInput = "";
         private string padValidationMsg = "";
 
+        // Language Dropdown Popup State
+        private bool showLanguageDropdown = false;
+        private Rect langButtonRect;
+
         // UI Styles
         private GUIStyle headerStyle;
         private GUIStyle tableHeaderStyle;
@@ -403,7 +407,12 @@ namespace KSPPerformanceProfiler
             // Bottom-right corner resize grip handle
             DrawWindowResizeGrip();
 
-            if (!isResizing)
+            if (showLanguageDropdown)
+            {
+                DrawLanguageDropdownPopup();
+            }
+
+            if (!isResizing && !showLanguageDropdown)
             {
                 // Drag window via top header area (36px)
                 GUI.DragWindow(new Rect(0, 0, fullWindowRect.width, 36f));
@@ -433,6 +442,56 @@ namespace KSPPerformanceProfiler
             GUI.color = prevCol;
         }
 
+        private void DrawLanguageDropdownPopup()
+        {
+            float menuW = 150f;
+            float itemH = 24f;
+            int totalItems = ProfilerI18n.AvailablePacks.Count + 1; // Auto + packs
+            float menuH = totalItems * itemH + 10f;
+            Rect menuRect = new Rect(langButtonRect.x, langButtonRect.yMax + 2f, menuW, menuH);
+
+            Event cur = Event.current;
+            if (cur.type == EventType.MouseDown && !menuRect.Contains(cur.mousePosition) && !langButtonRect.Contains(cur.mousePosition))
+            {
+                showLanguageDropdown = false;
+                return;
+            }
+
+            Color prevCol = GUI.color;
+            GUI.color = new Color(0.12f, 0.14f, 0.18f, 0.98f);
+            GUI.DrawTexture(menuRect, whitePixelTex);
+            GUI.color = prevCol;
+            GUI.Box(menuRect, GUIContent.none, cardAccentStyle);
+
+            GUILayout.BeginArea(new Rect(menuRect.x + 3f, menuRect.y + 4f, menuRect.width - 6f, menuRect.height - 8f));
+            GUILayout.BeginVertical();
+
+            // Auto Option
+            bool isAuto = ProfilerI18n.CurrentPackIndex == -1;
+            var activePack = ProfilerI18n.GetActiveLanguagePack();
+            string autoText = isAuto && activePack != null ? $"● 🌐 Auto ({activePack.Name})" : "🌐 Auto";
+            if (GUILayout.Button(autoText, isAuto ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Height(itemH)))
+            {
+                ProfilerI18n.CurrentPackIndex = -1;
+                showLanguageDropdown = false;
+            }
+
+            for (int i = 0; i < ProfilerI18n.AvailablePacks.Count; i++)
+            {
+                var pack = ProfilerI18n.AvailablePacks[i];
+                bool isSelected = ProfilerI18n.CurrentPackIndex == i;
+                string label = isSelected ? $"● {pack.Name}" : pack.Name;
+                if (GUILayout.Button(label, isSelected ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Height(itemH)))
+                {
+                    ProfilerI18n.CurrentPackIndex = i;
+                    showLanguageDropdown = false;
+                }
+            }
+
+            GUILayout.EndVertical();
+            GUILayout.EndArea();
+        }
+
         private void DrawHeaderHUD()
         {
             double ptr = ProfilerData.SmoothPTR * 100.0;
@@ -451,15 +510,32 @@ namespace KSPPerformanceProfiler
 
             GUILayout.BeginHorizontal(cardStyle);
 
-            // Mod Brand & Status Dot
+            // Mod Brand Title & Status Dot
             string statusDot = ProfilerData.IsEnabled ? "<color=#33FF33>●</color>" : "<color=#888888>○</color>";
-            GUILayout.Label($"{statusDot} <b>KSPPerformanceProfiler</b>", headerStyle, GUILayout.Width(140));
+            GUILayout.Label($"{statusDot} <b>KSPPerformanceProfiler</b>", headerStyle, GUILayout.Width(130));
+
+            // Language Selector Button directly next to the main title
+            if (GUILayout.Button(ProfilerI18n.GetHeaderLanguageButtonText(), GUILayout.Width(110), GUILayout.Height(22)))
+            {
+                showLanguageDropdown = !showLanguageDropdown;
+            }
+            if (Event.current.type == EventType.Repaint)
+            {
+                langButtonRect = GUILayoutUtility.GetLastRect();
+            }
+            if (Event.current.type == EventType.MouseDown && Event.current.button == 1 && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+            {
+                ProfilerI18n.ToggleNextLanguage();
+                Event.current.Use();
+            }
+
+            GUILayout.Space(2);
 
             // Core Telemetry Badges
-            GUILayout.Label($"<b>FPS:</b> <color={fpsColor}><b>{fps:F1}</b></color> (Avg: {avgFps:F1})", fpsStyle, GUILayout.Width(140));
-            GUILayout.Label($"<b>1% Low:</b> <color={fps1Color}><b>{fps1pct:F1}</b></color>", fpsStyle, GUILayout.Width(100));
-            GUILayout.Label($"<b>PTR:</b> <color={ptrColor}><b>{ptrStatusText}</b></color>", ptrStyle, GUILayout.Width(95));
-            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_total_frame")}:</b> {ProfilerData.SmoothTotalFrameMs:F1}ms (<color={jitterColor}>{jitter:F1}ms</color>)", headerStyle, GUILayout.Width(170));
+            GUILayout.Label($"<b>FPS:</b> <color={fpsColor}><b>{fps:F0}</b></color> ({avgFps:F0})", fpsStyle, GUILayout.Width(110));
+            GUILayout.Label($"<b>1% Low:</b> <color={fps1Color}><b>{fps1pct:F0}</b></color>", fpsStyle, GUILayout.Width(85));
+            GUILayout.Label($"<b>PTR:</b> <color={ptrColor}><b>{ptrStatusText}</b></color>", ptrStyle, GUILayout.Width(75));
+            GUILayout.Label($"<b>{ProfilerI18n.Get("metric_total_frame")}:</b> {ProfilerData.SmoothTotalFrameMs:F1}ms (<color={jitterColor}>{jitter:F1}ms</color>)", headerStyle, GUILayout.Width(150));
 
             // Real-time Mono GC Monitor Badge
             string gcBadge;
@@ -476,27 +552,22 @@ namespace KSPPerformanceProfiler
                 string gcColor = ProfilerData.GcFramesSinceLastCollect > 300 ? "#33FF33" : "#aaaaaa";
                 gcBadge = $"<color={gcColor}>GC: {ProfilerData.GcTotalCollections}</color>";
             }
-            GUILayout.Label(gcBadge, headerStyle, GUILayout.Width(105));
+            GUILayout.Label(gcBadge, headerStyle, GUILayout.Width(80));
 
             GUILayout.FlexibleSpace();
-
-            // Window size indicator
-            string sizeText = ProfilerI18n.Format("window_size_info", fullWindowRect.width, fullWindowRect.height);
-            GUILayout.Label(sizeText, tipStyle, GUILayout.Width(80));
-            GUILayout.Space(4);
 
             // Toggle Profiling button
             string toggleText = ProfilerData.IsEnabled ? ProfilerI18n.Get("enabled") : ProfilerI18n.Get("disabled");
             Color oldCol = GUI.color;
             if (!ProfilerData.IsEnabled) GUI.color = new Color(1f, 0.6f, 0.6f, 1f);
-            if (GUILayout.Button(toggleText, GUILayout.Width(105), GUILayout.Height(22)))
+            if (GUILayout.Button(toggleText, GUILayout.Width(95), GUILayout.Height(22)))
             {
                 ProfilerData.IsEnabled = !ProfilerData.IsEnabled;
             }
             GUI.color = oldCol;
 
             // Mini HUD Button
-            if (GUILayout.Button($"🗖 {ProfilerI18n.Get("mode_mini")}", GUILayout.Width(85), GUILayout.Height(22)))
+            if (GUILayout.Button($"🗖 {ProfilerI18n.Get("mode_mini")}", GUILayout.Width(80), GUILayout.Height(22)))
             {
                 IsMiniHud = true;
             }

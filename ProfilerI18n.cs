@@ -555,5 +555,27 @@ namespace KSPPerformanceProfiler
 
             return $"🌐 {Get("lang_label")}";
         }
+
+        public static string GetHeaderLanguageButtonText()
+        {
+            if (!isInitialized || AvailablePacks.Count == 0)
+            {
+                ReloadLanguagePacks();
+            }
+
+            if (CurrentPackIndex == -1)
+            {
+                var pack = GetActiveLanguagePack();
+                string activeName = pack != null ? pack.Name : "Auto";
+                return $"🌐 {activeName} ▾";
+            }
+
+            if (CurrentPackIndex >= 0 && CurrentPackIndex < AvailablePacks.Count)
+            {
+                return $"🌐 {AvailablePacks[CurrentPackIndex].Name} ▾";
+            }
+
+            return "🌐 Lang ▾";
+        }
     }
 }
