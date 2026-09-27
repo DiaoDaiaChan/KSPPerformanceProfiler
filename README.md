@@ -3,7 +3,7 @@
 [![KSP Version](https://img.shields.io/badge/KSP-1.12.x-brightgreen.svg?style=for-the-badge&logo=kerbalspaceprogram)](https://www.kerbalspaceprogram.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Release](https://img.shields.io/badge/Release-v1.2.0-blue.svg?style=for-the-badge)](https://github.com/DiaoDaiaChan/KSPPerformanceProfiler/releases)
-[![Language](https://img.shields.io/badge/Language-English%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-blueviolet.svg?style=for-the-badge)](#-language--%E5%A4%9A%E8%AF%AD%E8%A8%80)
+[![Language](https://img.shields.io/badge/Language-EN%20%7C%20ZH%20%7C%20RU%20%7C%20ES%20%7C%20DE%20%7C%20JA-blueviolet.svg?style=for-the-badge)](#-多语言支持--internationalization-i18n)
 
 > **Next-Generation In-Game Low-Level Performance Profiler, Stutter Hunter & Native Mono Heap Padder for Kerbal Space Program (KSP 1.12.x).**  
 > *坎巴拉太空计划新一代低开销游戏内底层性能分析器、微卡顿猎犬与原生 Mono 堆内存防卡顿管理工具。*
@@ -20,6 +20,7 @@
   - [4. 🧠 智能瓶颈诊断与处方引擎 (Smart Bottleneck Diagnostics)](#4--智能瓶颈诊断与处方引擎-smart-bottleneck-diagnostics)
   - [5. 🌳 五层深度级联钻取与调度器穿透 (5-Level Deep Drill-Down)](#5--五层深度级联钻取与调度器穿透-5-level-deep-drill-down)
   - [6. 🪟 自由拖拽缩放与自适应布局 (Free Resize & Responsive UI)](#6--自由拖拽缩放与自适应布局-free-resize--responsive-ui)
+- [🌐 多语言支持 / Internationalization (i18n)](#-多语言支持--internationalization-i18n)
 - [⌨️ 快捷键指南 / Hotkeys Guide](#️-快捷键指南--hotkeys-guide)
 - [📦 安装说明 / Installation](#-安装说明--installation)
 - [🛠️ 源码构建 / Build from Source](#️-源码构建--build-from-source)
@@ -101,6 +102,24 @@
 
 ---
 
+## 🌐 多语言支持 / Internationalization (i18n)
+
+内置 6 种主流语言包，与 KSP 官方本地化及全球社区高度契合：
+
+| 语言代码 | 语言名称 | 状态 | 适用地区 / 社区 |
+|:---:|:---:|:---:|:---|
+| `en-us` | English | ✅ 官方支持 | Global / International Community |
+| `zh-cn` | 简体中文 | ✅ 官方支持 | 中国大陆 / 华语圈社区 |
+| `ru` | Русский | ✅ 社区精翻 | Россия / СНГ (Крупнейшее сообщество KSP) |
+| `es-es` | Español | ✅ 官方本地化 | España / Latinoamérica |
+| `de-de` | Deutsch | ✅ 官方本地化 | Deutschland / Österreich / Schweiz |
+| `ja` | 日本語 | ✅ 官方本地化 | 日本 KSP コミュニティ |
+
+- **自动侦测**：默认优先匹配 KSP 当前所选语言；若未匹配则自动读取操作系统语言环境。
+- **一键热切**：在设置页点击语言按钮即可随时实时热切换，无需重启游戏！
+
+---
+
 ## ⌨️ 快捷键指南 / Hotkeys Guide
 
 | 快捷键 | 功能说明 |
@@ -131,14 +150,18 @@
            ├── Icons/
            │   └── icon.png
            ├── Localization/
+           │   ├── de-de.json
            │   ├── en-us.json
+           │   ├── es-es.json
+           │   ├── ja.json
+           │   ├── ru.json
            │   └── zh-cn.json
            ├── Plugins/
            │   ├── KSPPerformanceProfiler.dll
            │   └── KSPPerformanceProfiler.pdb
            └── KSPPerformanceProfiler.version
    ```
-4. 启动游戏并加载存档，进入飞行场景即可自动加载使用。
+4. 启动游戏，在任意场景（飞行、地图、航天中心、空间站、装配大楼）点击工具栏图标或使用快捷键即可打开。
 
 ---
 
