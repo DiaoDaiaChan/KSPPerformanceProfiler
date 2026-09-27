@@ -13,13 +13,14 @@ namespace KSPPerformanceProfiler
     public static class MonoHeapPadder
     {
         public static int TargetPadMb = 2048;
-        public static bool AutoPadOnSceneChange = true;
+        public static bool AutoPadOnSceneChange = false;
         public static bool EnableHotkey = true;
         public static string LastStatusMessage = "";
         public static DateTime LastPadTime = DateTime.MinValue;
 
         private static bool isInitialized = false;
         private static string configFilePath = "";
+        private static bool hasShownReminder = false;
 
         // Permanent padding blocks - kept alive to prevent Mono from shrinking the heap
         private static byte[][] padBlocks = null;
@@ -111,6 +112,7 @@ namespace KSPPerformanceProfiler
 
                 TargetPadMb = Math.Max(1024, TargetPadMb == 0 ? RecommendedPadMb : TargetPadMb);
 
+                // Only auto-pad if user has explicitly enabled it in config
                 if (AutoPadOnSceneChange && !IsPadded)
                 {
                     Pad(TargetPadMb, silent: true);
@@ -129,6 +131,21 @@ namespace KSPPerformanceProfiler
             if (AutoPadOnSceneChange && TargetPadMb > 0 && !IsPadded)
             {
                 Pad(TargetPadMb, silent: true);
+            }
+            else if (!IsPadded && !hasShownReminder)
+            {
+                // Show a one-time non-intrusive reminder
+                hasShownReminder = true;
+                try
+                {
+                    int recMb = RecommendedPadMb;
+                    ScreenMessages.PostScreenMessage(
+                        $"[KSPPerformanceProfiler] 💡 Heap Padder available: recommend {recMb} MB for your {SystemRamMb / 1024} GB RAM. Open Settings tab or press Alt+End to apply.",
+                        8.0f,
+                        ScreenMessageStyle.UPPER_CENTER
+                    );
+                }
+                catch { }
             }
         }
 
