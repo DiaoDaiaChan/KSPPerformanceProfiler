@@ -240,10 +240,14 @@ namespace KSPPerformanceProfiler
             if (IsMiniHud)
             {
                 miniWindowRect = GUI.Window(948202, miniWindowRect, DrawMiniHudWindow, ProfilerI18n.Get("app_mini_title"));
+                miniWindowRect.x = Mathf.Clamp(miniWindowRect.x, 0, Screen.width - 60f);
+                miniWindowRect.y = Mathf.Clamp(miniWindowRect.y, 0, Screen.height - 40f);
             }
             else
             {
                 fullWindowRect = GUI.Window(948201, fullWindowRect, DrawFullWindow, ProfilerI18n.Get("app_title"));
+                fullWindowRect.x = Mathf.Clamp(fullWindowRect.x, 0, Screen.width - 60f);
+                fullWindowRect.y = Mathf.Clamp(fullWindowRect.y, 0, Screen.height - 40f);
             }
         }
 
@@ -401,8 +405,8 @@ namespace KSPPerformanceProfiler
 
             if (!isResizing)
             {
-                // Drag window everywhere except the bottom 24px and corner
-                GUI.DragWindow(new Rect(0, 0, fullWindowRect.width, fullWindowRect.height - 24f));
+                // Drag window via top header area (36px)
+                GUI.DragWindow(new Rect(0, 0, fullWindowRect.width, 36f));
             }
         }
 

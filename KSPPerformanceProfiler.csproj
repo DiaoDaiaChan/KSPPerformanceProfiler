@@ -64,6 +64,7 @@
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\GameData\KSPPerformanceProfiler\Plugins\" ContinueOnError="true" />
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ProjectDir)..\GameData\KSPPerformanceProfiler\Plugins\" Condition="Exists('$(TargetDir)$(TargetName).pdb')" ContinueOnError="true" />
     <Copy SourceFiles="$(ProjectDir)Icons\icon.png" DestinationFolder="$(ProjectDir)..\GameData\KSPPerformanceProfiler\Icons\" Condition="Exists('$(ProjectDir)Icons\icon.png')" ContinueOnError="true" />
+    <Copy SourceFiles="$(ProjectDir)KSPPerformanceProfiler.version" DestinationFolder="$(ProjectDir)..\GameData\KSPPerformanceProfiler\" Condition="Exists('$(ProjectDir)KSPPerformanceProfiler.version')" ContinueOnError="true" />
     <Copy SourceFiles="@(LocalizationFiles)" DestinationFolder="$(ProjectDir)..\GameData\KSPPerformanceProfiler\Localization\" ContinueOnError="true" />
   </Target>
 </Project>

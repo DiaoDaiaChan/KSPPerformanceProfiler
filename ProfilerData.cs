@@ -1174,8 +1174,36 @@ namespace KSPPerformanceProfiler
 
         public static void ResetAllPeakData()
         {
-            foreach (var m in moduleStatsMap.Values) m.PeakMs = 0;
-            foreach (var p in pluginStatsMap.Values) p.PeakMs = 0;
+            foreach (var m in moduleStatsMap.Values)
+            {
+                m.PeakMs = 0;
+                m.DisplayPeakMs = 0;
+                foreach (var meth in m.Methods.Values)
+                {
+                    meth.PeakMs = 0;
+                    meth.DisplayPeakMs = 0;
+                    foreach (var sub in meth.SubInvocations.Values)
+                    {
+                        sub.PeakMs = 0;
+                        sub.DisplayPeakMs = 0;
+                    }
+                }
+            }
+            foreach (var p in pluginStatsMap.Values)
+            {
+                p.PeakMs = 0;
+                p.DisplayPeakMs = 0;
+                foreach (var meth in p.Methods.Values)
+                {
+                    meth.PeakMs = 0;
+                    meth.DisplayPeakMs = 0;
+                    foreach (var sub in meth.SubInvocations.Values)
+                    {
+                        sub.PeakMs = 0;
+                        sub.DisplayPeakMs = 0;
+                    }
+                }
+            }
         }
 
         public static List<AssemblyStats> GetAssemblyBreakdown(string filter = null, int sortColumn = 1, bool sortAsc = false)

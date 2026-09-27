@@ -136,12 +136,12 @@ namespace KSPPerformanceProfiler
 
         private static void PartModule_Postfix(PartModule __instance, MethodBase __originalMethod, long __state)
         {
-            if (ProfilerData.IsEnabled && __state > 0 && __instance != null)
+            if (ProfilerData.IsEnabled && __state > 0 && __instance != null && __originalMethod != null)
             {
                 long elapsed = Stopwatch.GetTimestamp() - __state;
                 if (!methodNameCache.TryGetValue(__originalMethod, out string methodName))
                 {
-                    methodName = __originalMethod != null ? __originalMethod.Name : "Execute";
+                    methodName = __originalMethod.Name;
                     methodNameCache[__originalMethod] = methodName;
                 }
                 ProfilerData.RecordModuleExecution(__instance, methodName, elapsed);
@@ -155,12 +155,12 @@ namespace KSPPerformanceProfiler
 
         private static void Plugin_Postfix(MonoBehaviour __instance, MethodBase __originalMethod, long __state)
         {
-            if (ProfilerData.IsEnabled && __state > 0 && __instance != null)
+            if (ProfilerData.IsEnabled && __state > 0 && __instance != null && __originalMethod != null)
             {
                 long elapsed = Stopwatch.GetTimestamp() - __state;
                 if (!methodNameCache.TryGetValue(__originalMethod, out string methodName))
                 {
-                    methodName = __originalMethod != null ? __originalMethod.Name : "Execute";
+                    methodName = __originalMethod.Name;
                     methodNameCache[__originalMethod] = methodName;
                 }
                 ProfilerData.RecordPluginExecution(__instance, methodName, elapsed);
