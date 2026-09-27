@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace KSPPerformanceProfiler
 {
-    [KSPAddon(KSPAddon.Startup.Flight, false)]
+    [KSPAddon(KSPAddon.Startup.EveryScene, false)]
     public class PhysProfilerPlugin : MonoBehaviour
     {
         public static PhysProfilerPlugin Instance { get; private set; }
@@ -221,7 +221,7 @@ namespace KSPPerformanceProfiler
                 OnAppLauncherTrue,
                 OnAppLauncherFalse,
                 null, null, null, null,
-                ApplicationLauncher.AppScenes.FLIGHT,
+                ApplicationLauncher.AppScenes.ALWAYS,
                 icon
             );
 
