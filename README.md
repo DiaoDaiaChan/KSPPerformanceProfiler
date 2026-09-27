@@ -1,3 +1,5 @@
+**English** | [简体中文](README.zh-CN.md)
+
 <p align="center">
   <img src="Icons/icon.png" alt="KSPPerformanceProfiler" width="128">
 </p>
@@ -7,127 +9,127 @@
 [![KSP Version](https://img.shields.io/badge/KSP-1.12.x-brightgreen.svg?style=for-the-badge&logo=kerbalspaceprogram)](https://www.kerbalspaceprogram.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Release](https://img.shields.io/badge/Release-v1.2.0-blue.svg?style=for-the-badge)](https://github.com/DiaoDaiaChan/KSPPerformanceProfiler/releases)
-[![Language](https://img.shields.io/badge/Language-EN%20%7C%20ZH%20%7C%20RU%20%7C%20ES%20%7C%20DE%20%7C%20JA-blueviolet.svg?style=for-the-badge)](#-多语言支持)
+[![Language](https://img.shields.io/badge/Language-EN%20%7C%20ZH%20%7C%20RU%20%7C%20ES%20%7C%20DE%20%7C%20JA-blueviolet.svg?style=for-the-badge)](#-multi-language)
 
-> **坎巴拉太空计划（KSP 1.12.x）新一代低开销游戏内性能分析器、微卡顿猎犬与原生 Mono 堆内存防卡顿管理工具。**
-> 覆盖飞行、地图、航天中心、空间站与装配大楼全场景，可穿透原生调度器定位高耗时 Mod 回调，告别盲目排查卡顿。
+> **A next-generation, low-overhead in-game performance profiler, micro-stutter hunter, and native Mono heap anti-stutter manager for Kerbal Space Program (KSP 1.12.x).**
+> Works in every scene — Flight, Map, KSC, and VAB/SPH — and drills through the native dispatcher to locate heavy Mod callbacks, ending blind stutter hunting.
 
 ---
 
-## 🖼️ 界面预览
+## 🖼️ Preview
 
-| **仪表盘与交互式时间线** | **掉帧抓拍与真凶分析** |
+| **Dashboard & Interactive Timeline** | **Spike Sniffer & Culprit Analysis** |
 |:---:|:---:|
 | ![Dashboard](Screenshots/01_dashboard.png) | ![Spike Sniffer](Screenshots/02_spike_sniffer.png) |
-| **调度器委托深度穿透** | **堆内存垫高与内存推荐** |
+| **Dispatcher Delegate Penetration** | **Heap Padder & Memory Recommendation** |
 | ![Dispatcher Penetration](Screenshots/03_dispatcher_penetration.png) | ![Heap Padder](Screenshots/04_heap_padder.png) |
 
-> 💡 需要极简常驻监控时，可切换至 [迷你 HUD 浮窗模式](Screenshots/05_mini_hud.png)。
+> 💡 For a minimal always-on monitor, switch to [Mini HUD mode](Screenshots/05_mini_hud.png).
 
 ---
 
-## 🌟 核心特性
+## 🌟 Core Features
 
-### 1. ⚡ Mono 堆内存防卡顿管理
+### 1. ⚡ Mono Heap Anti-Stutter Management
 
-安装大量 Mod 后，Mono 垃圾回收（GC Stop-The-World）是微卡顿的首要来源。本工具原生集成常驻堆内存保护：
+With many Mods installed, Mono garbage collection (GC Stop-The-World) is the leading source of micro-stutters. This tool natively integrates resident heap protection:
 
-- **静态常驻 GC 根对象**：物理内存块常驻静态根引用，即使手动或自动触发 GC，**垫高块也绝不释放、绝不回缩**，将每几秒一次的 GC 卡顿推迟至数十分钟一次。
-- **非侵入式设计**：首次安装默认**不主动垫高**，仅在加载场景后提示推荐值，由玩家在设置页手动应用或按快捷键确认。
-- **智能内存探测**：自动识别本机物理内存（8G / 16G / 32G / 64G+），推荐安全垫高容量，并预留至少 4GB 供系统与 GPU 使用。
-- **细粒度微调**：支持输入任意整数（MB），提供 `[-1024M]` `[-512M]` `[+512M]` `[+1024M]` 步进按钮，并可一键释放垫高、归还物理内存。
+- **Permanent static GC root**: the physical memory block lives in a static root reference. Even when GC is triggered manually or automatically, **the padded block is never released and never shrinks**, pushing GC stalls from every few seconds to once every tens of minutes.
+- **Non-intrusive by design**: on first install it does **not pad automatically**; it only suggests a recommended value after a scene loads, and the player applies it manually in settings or via a hotkey.
+- **Smart memory detection**: detects physical RAM (8G / 16G / 32G / 64G+), recommends a safe padding size, and reserves at least 4GB for the system and GPU.
+- **Fine-grained tuning**: accepts any integer (MB), provides `[-1024M]` `[-512M]` `[+512M]` `[+1024M]` step buttons, and can release the padding in one click to return memory to the system.
 
-### 2. 🎯 掉帧抓拍与卡顿自动冻结
+### 2. 🎯 Frame-Spike Capture & Auto-Freeze
 
-- **微秒级掉帧雷达**：某帧耗时突增超过基准 200% 且大于 35ms（或帧率跌破 15 FPS）时，自动截获该帧完整诊断拓扑。
-- **六大真凶排行**：列出该帧耗时占比最高的 6 个实体，精确定位到类名、Mod 程序集、生命周期方法，并标明是否由 GC 引起。
-- **自动急冻复盘**：开启后，在严重卡顿瞬间自动暂停物理引擎与游戏时钟，保留案发现场，分析完毕一键解除。
+- **Microsecond spike radar**: when a frame's time exceeds 200% of baseline and 35ms (or FPS drops below 15), the frame's full diagnostic topology is captured automatically.
+- **Top-6 culprit ranking**: lists the 6 entities with the highest cost share in that frame, pinpointing the class name, Mod assembly, lifecycle method, and whether GC caused it.
+- **Auto-freeze review**: when enabled, it pauses the physics engine and game clock at the moment of a severe stutter to preserve the scene; one click resumes.
 
-### 3. 📊 交互式时间线图表
+### 3. 📊 Interactive Timeline Graph
 
-- **双模式图表**：堆叠面积图展示部件模块、插件脚本、PhysX 物理、GPU 渲染与引擎调度的耗时构成；FPS 曲线标定 60 / 30 / 20 FPS 基准线与 1% Low 平滑度指标。
-- **悬停检视**：鼠标悬停任意柱体即可查看该帧的微秒构成与各模块占比。
-- **单帧锁定**：点击异常帧即可锁定高亮，在下方分析卡片中复盘该帧构成。
-- **图层开关**：可分别显示或隐藏模块、插件、物理、GPU 等图层。
-- **GC 标记**：时间线上方以橙色 `◆` 标出发生 GC 的帧。
+- **Dual-mode chart**: a stacked area chart shows the cost breakdown across PartModules, plugin scripts, PhysX physics, GPU rendering, and engine scheduling; the FPS curve marks 60 / 30 / 20 FPS baselines and the 1% Low smoothness metric.
+- **Hover inspection**: hover any bar to see that frame's microsecond composition and per-module share.
+- **Single-frame lock**: click an anomaly frame to highlight it and review its composition in the card below.
+- **Layer toggles**: show or hide the module, plugin, physics, and GPU layers independently.
+- **GC markers**: an orange `◆` above the timeline marks frames where GC occurred.
 
-### 4. 🧠 智能瓶颈诊断
+### 4. 🧠 Smart Bottleneck Diagnostics
 
-自动识别性能短板并给出优化处方：
+Automatically identifies performance shortfalls and suggests fixes:
 
-| 诊断状态 | 表现特征 | 优化处方 |
+| Diagnosis | Symptoms | Recommendation |
 |:---|:---|:---|
-| 🛑 **物理解算过载** | 物理实速比下降，顶部时钟变黄/红 | 减少部件数、减少 AutoStrut 刚化或安装 KSPCommunityFixes |
-| 🛑 **Mod 全局插件过载** | 全局单例管理器脚本占用 CPU 高 | 在插件列表中按耗时排序定位高耗时 Mod |
-| 🛑 **部件模块脚本过载** | 载具部件模块耗时暴增 | 检查 Waterfall、FAR、B9 等模块的高耗时部件 |
-| 🛑 **GPU / 渲染瓶颈** | 显卡满载，帧耗时集中在渲染管线 | 调低分辨率、抗锯齿或地表散布密度 |
-| 🛑 **后处理负载过高** | TUFX 多通道导致 CPU/GPU 开销大 | 减少激活的 TUFX 通道或关闭景深/抗锯齿 |
-| 🛑 **微卡顿 / GC** | 1% Low 帧率骤降，帧抖动剧烈 | 使用内置堆内存垫高延缓 GC 频率 |
-| 🟢 **极度流畅** | 物理时钟满速、帧率平稳 | 性能极佳，尽情飞行 |
+| 🛑 **Physics / Joints bound** | Physics real-time ratio drops, top clock turns yellow/red | Reduce part count, reduce AutoStrut rigidity, or install KSPCommunityFixes |
+| 🛑 **Mod plugin overhead** | Global singleton manager scripts use high CPU | Sort the plugin list by cost to locate heavy Mods |
+| 🛑 **PartModule bound** | PartModule cost spikes on the vessel | Check heavy parts in Waterfall, FAR, B9, etc. |
+| 🛑 **GPU / render bound** | GPU saturated, frame time concentrated in the render pipeline | Lower resolution, anti-aliasing, or ground scatter density |
+| 🛑 **Post-processing overhead** | TUFX multi-pass adds high CPU/GPU cost | Reduce active TUFX passes or disable DoF/AA |
+| 🛑 **Micro-stutters / GC** | 1% Low FPS drops sharply, heavy jitter | Use the built-in heap padder to reduce GC frequency |
+| 🟢 **Balanced & smooth** | Physics clock at full speed, stable FPS | Excellent performance — enjoy the flight |
 
-### 5. 🌳 五层钻取与调度器穿透
+### 5. 🌳 Five-Level Drill-Down & Dispatcher Penetration
 
-从高层 Mod 程序集一路下钻至底层方法：
+Drills from high-level Mod assemblies down to low-level methods:
 
 ```text
-📦 程序集
- └── 📂 功能子系统（时钟调度 / 载具动力学 / 天体轨道 / 出舱 / 编辑器）
-      └── 📄 具体类型
-           └── ⚙️ 生命周期方法（FixedUpdate / Update / LateUpdate / OnRenderImage）
-                └── ⚡ 调度器穿透（TimingPre、Timing1~5 → Principia、Scatterer…）
+📦 Assembly (DLL)
+ └── 📂 Subsystem (timing / vessel dynamics / celestial orbits / EVA / editor)
+      └── 📄 Concrete type (class / component)
+           └── ⚙️ Lifecycle method (FixedUpdate / Update / LateUpdate / OnRenderImage)
+                └── ⚡ Dispatcher penetration (TimingPre, Timing1~5 → Principia, Scatterer…)
 ```
 
-**调度器穿透是本 Mod 的核心差异化能力**：传统工具查看 `TimingPre` 或 `TimingManager` 时只能看到原生黑盒耗时，本 Mod 可直接钻入底层委托调用链，抓出隐藏在原生调度器背后的真实 Mod 回调（如 `PrincipiaPluginAdapter.Precalc`）。
+**Dispatcher penetration is the core differentiator of this Mod**: traditional tools see only native black-box cost when inspecting `TimingPre` or `TimingManager`, whereas this Mod drills directly into the underlying delegate call chain to surface the real Mod callbacks hidden behind the native dispatcher (e.g. `PrincipiaPluginAdapter.Precalc`).
 
-### 6. 🪟 自由缩放与自适应布局
+### 6. 🪟 Free Resize & Responsive Layout
 
-- **自由缩放**：拖动右下角 `◢` 手柄即可调整窗口尺寸，自动适配 1080p / 2K / 4K。
-- **全场景可用**：覆盖飞行、地图、航天中心、装配大楼与深空追踪站。
-- **坐标记忆**：窗口尺寸与位置自动保存，并带屏幕边界吸附，避免窗口被拖出屏幕外。
-- **一键导出**：将完整诊断报告导出至 `GameData/KSPPerformanceProfiler/Logs/`，便于反馈排查。
+- **Free resize**: drag the `◢` handle at the bottom-right to resize; adapts to 1080p / 2K / 4K.
+- **Works everywhere**: covers Flight, Map, KSC, VAB/SPH, and the Tracking Station.
+- **Position memory**: window size and position are saved automatically, with screen-edge snapping so the window can't be lost off-screen.
+- **One-click export**: exports a full diagnostic report to `GameData/KSPPerformanceProfiler/Logs/` for reporting.
 
 ---
 
-## 🌐 多语言支持
+## 🌐 Multi-Language
 
-内置 6 种语言包，与 KSP 官方本地化及全球社区契合：
+Ships with 6 language packs, aligned with KSP's official localization and global communities:
 
-| 语言代码 | 语言名称 | 状态 | 适用地区 |
+| Code | Language |
 |:---:|:---:|:---:|:---|
-| `zh-cn` | **简体中文** | ✅ 官方原生 | 中国大陆 / 华语圈 |
-| `en-us` | **English** | ✅ 官方支持 | 全球 / 国际社区 |
-| `ru` | **Русский** | ✅ 社区精翻 | 俄罗斯 / 独联体 |
-| `es-es` | **Español** | ✅ 官方本地化 | 西班牙 / 拉美 |
-| `de-de` | **Deutsch** | ✅ 官方本地化 | 德国 / 奥地利 / 瑞士 |
-| `ja` | **日本語** | ✅ 官方本地化 | 日本社区 |
+| `zh-cn` | **简体中文** | 
+| `en-us` | **English** |
+| `ru` | **Русский** |
+| `es-es` | **Español** | 
+| `de-de` | **Deutsch** | 
+| `ja` | **日本語** |
 
-- **主标题栏直达**：主标题栏旁的 `🌐 Language ▾` 按钮可呼出下拉菜单，支持左键点选与右键快速轮换。
-- **设置页自适应网格**：设置页提供自适应换行按钮列表，并支持 `[ 🔄 重新扫描语言包 ]`，新增语言包即时热生效，无需重启游戏。
+- **Header shortcut**: the `🌐 Language ▾` button next to the header opens a dropdown; left-click to pick, right-click to cycle quickly.
+- **Adaptive settings grid**: the settings page offers a wrapping button list and a `[ 🔄 Rescan language packs ]` action; new packs take effect instantly without restarting the game.
 
 ---
 
-## ⌨️ 快捷键
+## ⌨️ Hotkeys
 
-| 快捷键 | 功能 |
+| Hotkey | Action |
 |:---|:---|
-| `Ctrl + Shift + P` / `Alt + Shift + P` / `小键盘加号 (+)` | 打开 / 关闭完整性能分析面板 |
-| `Ctrl + Shift + H` / `Alt + Shift + H` | 打开 / 切换迷你 HUD 模式 |
-| `Alt + End` / `Mod + End` | 快捷应用推荐的 Mono 堆内存垫高 |
+| `Ctrl + Shift + P` / `Alt + Shift + P` / `Numpad +` | Toggle the full profiler panel |
+| `Ctrl + Shift + H` / `Alt + Shift + H` | Open / toggle Mini HUD mode |
+| `Alt + End` / `Mod + End` | Apply the recommended Mono heap padding |
 
-> 💡 在任意场景也可点击游戏右侧应用启动器上的绿色性能图标打开面板。
+> 💡 You can also open the panel from the green performance icon on the game's AppLauncher in any scene.
 
 ---
 
-## 📦 安装
+## 📦 Installation
 
-### 依赖项
-- **Kerbal Space Program 1.12.x**（1.12.0 ~ 1.12.5）
-- **Harmony 2.x**（`000_Harmony`，通常已由 ModuleManager、Community Category Kit、KSPCommunityFixes 等 Mod 自带）
+### Requirements
+- **Kerbal Space Program 1.12.x** (1.12.0 – 1.12.5)
+- **Harmony 2.x** (`000_Harmony`, usually bundled with ModuleManager, Community Category Kit, KSPCommunityFixes, etc.)
 
-### 手动安装
-1. 前往 [Releases 页面](https://github.com/DiaoDaiaChan/KSPPerformanceProfiler/releases) 下载最新的 `KSPPerformanceProfiler-vX.X.X.zip`。
-2. 解压并将 `GameData/KSPPerformanceProfiler` 文件夹完整拷贝至 KSP 根目录下的 `GameData/`。
-3. 安装后的正确路径结构如下：
+### Manual installation
+1. Download the latest `KSPPerformanceProfiler-vX.X.X.zip` from the [Releases page](https://github.com/DiaoDaiaChan/KSPPerformanceProfiler/releases).
+2. Unzip and copy the `GameData/KSPPerformanceProfiler` folder into your KSP root `GameData/`.
+3. The correct folder structure after installation:
 
    ```text
    Kerbal Space Program/
@@ -148,46 +150,46 @@
            │   └── KSPPerformanceProfiler.pdb
            └── KSPPerformanceProfiler.version
    ```
-4. 启动游戏，在任意场景点击工具栏图标或按快捷键即可打开。
+4. Launch the game and click the toolbar icon or press a hotkey in any scene to open.
 
 ---
 
-## 🛠️ 源码构建
+## 🛠️ Build from Source
 
-项目面向 .NET Framework 4.7.2 / C# 7.3 开发，支持 .NET CLI 或 Visual Studio 构建。
+The project targets .NET Framework 4.7.2 / C# 7.3 and builds with the .NET CLI or Visual Studio.
 
 ```bash
-# 1. 克隆代码仓库
+# 1. Clone the repository
 git clone https://github.com/DiaoDaiaChan/KSPPerformanceProfiler.git
 cd KSPPerformanceProfiler
 
-# 2. 执行编译（Release 配置）
+# 2. Build (Release)
 dotnet build KSPPerformanceProfiler.csproj -c Release
 ```
 
-构建成功后，PostBuild 会自动将 DLL、PDB、本地化文件与版本信息拷贝至 `GameData/KSPPerformanceProfiler/`。
+After a successful build, the PostBuild step copies the DLL, PDB, localization files, and version info to `GameData/KSPPerformanceProfiler/`.
 
 ---
 
-## ❓ 常见问题
+## ❓ FAQ
 
-#### Q: 这个 Mod 本身会带来多少性能开销？
-**A:** 几乎为零。核心拦截与渲染路径采用**零堆内存分配**策略，避免主循环产生额外 GC 垃圾；UI 刷新做 250ms 阻尼节流合并，自身 CPU 开销通常小于单帧 **0.05ms**。
+#### Q: How much performance overhead does the Mod itself add?
+**A:** Virtually none. Core interception and rendering paths use a strict **zero-allocation** strategy to avoid extra GC garbage in the main loop; UI refresh is throttled and merged with a 250ms damper, keeping the Mod's own CPU cost typically below **0.05ms** per frame.
 
-#### Q: 为什么安装后没有默认自动垫高内存？
-**A:** 我们坚持非侵入式原则，修改内存的行为应由玩家知情并主动确认。初次安装仅在加载完成后弹出一次性推荐提醒，不会擅自占用物理内存，可随时在设置页手动应用。
+#### Q: Why isn't heap padding applied automatically after installation?
+**A:** We follow a non-intrusive principle: modifying memory should be a player's informed, deliberate choice. On first install it only shows a one-time recommendation after loading and never takes your physical RAM on its own; you can apply it manually in settings anytime.
 
-#### Q: 我已经装了 MemGraph 或 HeapPadder，会冲突吗？
-**A:** 本 Mod 的堆内存垫高已完整替代 MemGraph / HeapPadder 的核心功能。建议卸载旧版，避免多个 Mod 同时申请垫高内存造成物理内存浪费。
+#### Q: I already have MemGraph or HeapPadder — will it conflict?
+**A:** This Mod's heap padder fully replaces the core functionality of MemGraph / HeapPadder. We recommend removing the old versions to avoid multiple Mods requesting extra padded memory and wasting physical RAM.
 
-#### Q: 游戏内看不见 Mod 图标怎么办？
-**A:** 本 Mod 已注册全场景显示。若工具栏图标被过多插件挤出屏幕，可直接按 `Ctrl + Shift + P` 或小键盘 `+` 呼出面板。
+#### Q: I can't see the Mod icon in-game — what should I do?
+**A:** This Mod registers for all scenes. If the toolbar icon is pushed off-screen by too many plugins, press `Ctrl + Shift + P` or the numpad `+` to open the panel.
 
 ---
 
-## 📄 开源协议
+## 📄 License
 
-本项目基于 [MIT License](LICENSE) 开放源码，可自由学习、分发与修改。欢迎提交 PR 与 Issue。
+Released under the [MIT License](LICENSE). You are free to study, distribute, and modify it. PRs and issues are welcome.
 
 ---
 
