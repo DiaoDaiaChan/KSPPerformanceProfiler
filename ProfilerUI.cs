@@ -120,6 +120,13 @@ namespace KSPPerformanceProfiler
         private GUIStyle headerStyle;
         private GUIStyle tableHeaderStyle;
         private GUIStyle tableHeaderBtnStyle;
+        private GUIStyle tableHeaderBtnRightStyle;
+        private GUIStyle tableCellLeft;
+        private GUIStyle tableCellRight;
+        private GUIStyle tableCellCenter;
+        private GUIStyle tableRowNameBtnStyle;
+        private GUIStyle tableRowEvenStyle;
+        private GUIStyle tableRowOddStyle;
         private GUIStyle ptrStyle;
         private GUIStyle fpsStyle;
         private GUIStyle cardStyle;
@@ -281,8 +288,70 @@ namespace KSPPerformanceProfiler
                 fontSize = 11,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleLeft,
-                margin = new RectOffset(1, 1, 1, 1),
+                margin = new RectOffset(0, 0, 0, 0),
                 padding = new RectOffset(4, 4, 3, 3)
+            };
+
+            tableHeaderBtnRightStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = 11,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleRight,
+                margin = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(4, 4, 3, 3)
+            };
+
+            tableCellLeft = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 11,
+                fontStyle = FontStyle.Normal,
+                alignment = TextAnchor.MiddleLeft,
+                margin = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(4, 4, 2, 2)
+            };
+
+            tableCellRight = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 11,
+                fontStyle = FontStyle.Normal,
+                alignment = TextAnchor.MiddleRight,
+                margin = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(4, 4, 2, 2)
+            };
+
+            tableCellCenter = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 11,
+                fontStyle = FontStyle.Normal,
+                alignment = TextAnchor.MiddleCenter,
+                margin = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(4, 4, 2, 2)
+            };
+
+            tableRowNameBtnStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 11,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleLeft,
+                margin = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(4, 4, 2, 2),
+                richText = true
+            };
+
+            tableRowEvenStyle = new GUIStyle(GUIStyle.none)
+            {
+                margin = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(0, 0, 0, 0)
+            };
+            Texture2D evenBgTex = new Texture2D(1, 1);
+            evenBgTex.SetPixel(0, 0, new Color(1f, 1f, 1f, 0.04f));
+            evenBgTex.Apply();
+            tableRowEvenStyle.normal.background = evenBgTex;
+
+            tableRowOddStyle = new GUIStyle(GUIStyle.none)
+            {
+                margin = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(0, 0, 0, 0)
             };
 
             ptrStyle = new GUIStyle(GUI.skin.label)
@@ -792,6 +861,34 @@ namespace KSPPerformanceProfiler
             GUI.color = Color.white;
         }
 
+        private void DrawTimeAndBarCell(double ms, double totalMs, float cellWidth = 110f)
+        {
+            Rect r = GUILayoutUtility.GetRect(cellWidth, 20f, GUILayout.Width(cellWidth), GUILayout.Height(20f));
+            float textW = 58f;
+            Rect textRect = new Rect(r.x, r.y, textW, r.height);
+            GUI.Label(textRect, $"{ms:F2} ms", tableCellRight);
+
+            float barW = Math.Max(10f, cellWidth - textW - 8f);
+            Rect barRect = new Rect(r.x + textW + 4f, r.y + 6f, barW, 8f);
+
+            // Background track
+            GUI.color = new Color(0.18f, 0.22f, 0.28f, 0.7f);
+            GUI.DrawTexture(barRect, whitePixelTex);
+
+            // Fill
+            float fillPct = Mathf.Clamp01((float)(ms / Math.Max(0.001, totalMs)));
+            float fillW = barRect.width * fillPct;
+            if (fillW > 0.5f)
+            {
+                Color fillCol = ms > 4.0 ? new Color(1f, 0.3f, 0.3f, 0.95f) :
+                               (ms > 1.2 ? new Color(1f, 0.75f, 0.2f, 0.95f) :
+                               new Color(0.2f, 0.85f, 0.5f, 0.9f));
+                GUI.color = fillCol;
+                GUI.DrawTexture(new Rect(barRect.x, barRect.y, fillW, barRect.height), whitePixelTex);
+            }
+            GUI.color = Color.white;
+        }
+
         #endregion
 
         #region Tab 0: Dashboard & Spike Sniffer
@@ -822,15 +919,19 @@ namespace KSPPerformanceProfiler
             GUILayout.Label($"<b>{ProfilerI18n.Get("graph_title")}</b>", headerStyle);
             GUILayout.FlexibleSpace();
 
-            if (GUILayout.Button(ProfilerI18n.Get("graph_mode_stacked"), graphMode == 0 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(140), GUILayout.Height(22)))
+            string[] modeOptions = new string[]
             {
-                graphMode = 0;
-            }
-            if (GUILayout.Button(ProfilerI18n.Get("graph_mode_curve"), graphMode == 1 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(170), GUILayout.Height(22)))
+                ProfilerI18n.Get("graph_mode_stacked"),
+                ProfilerI18n.Get("graph_mode_curve")
+            };
+            int newMode = GUILayout.Toolbar(graphMode, modeOptions, GUILayout.Height(24));
+            if (newMode != graphMode)
             {
-                graphMode = 1;
+                graphMode = newMode;
             }
             GUILayout.EndHorizontal();
+
+            GUILayout.Space(4);
 
             // Controls Toolbar Row 2: Interactive Legend on left, Time Span buttons on right
             GUILayout.BeginHorizontal();
@@ -884,17 +985,12 @@ namespace KSPPerformanceProfiler
             GUILayout.FlexibleSpace();
             GUILayout.Label(ProfilerI18n.Get("graph_scale_label"), tipStyle);
 
-            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_100"), graphTimeRange == 100 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(90), GUILayout.Height(20)))
+            string[] rangeOptions = new string[] { "100F (~1.5s)", "300F (~5s)", "600F (~10s)" };
+            int curRangeIdx = graphTimeRange == 600 ? 2 : (graphTimeRange == 300 ? 1 : 0);
+            int newRangeIdx = GUILayout.Toolbar(curRangeIdx, rangeOptions, GUILayout.Height(22));
+            if (newRangeIdx != curRangeIdx)
             {
-                graphTimeRange = 100;
-            }
-            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_300"), graphTimeRange == 300 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(90), GUILayout.Height(20)))
-            {
-                graphTimeRange = 300;
-            }
-            if (GUILayout.Button(ProfilerI18n.Get("graph_frames_600"), graphTimeRange == 600 ? tableHeaderBtnStyle : GUI.skin.button, GUILayout.Width(90), GUILayout.Height(20)))
-            {
-                graphTimeRange = 600;
+                graphTimeRange = newRangeIdx == 2 ? 600 : (newRangeIdx == 1 ? 300 : 100);
             }
             GUILayout.EndHorizontal();
 
@@ -1429,30 +1525,31 @@ namespace KSPPerformanceProfiler
 
             // Table Header with Sortable Buttons
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(GetHeaderTitle("col_plugin_class", 0, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
+            if (GUILayout.Button(GetHeaderTitle("col_plugin_class", 0, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.MinWidth(200), GUILayout.ExpandWidth(true)))
             {
                 ToggleSort(0, ref sortPluginsCol, ref sortPluginsAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_avg_ms", 1, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.Width(110)))
+            if (GUILayout.Button(GetHeaderTitle("col_avg_ms", 1, sortPluginsCol, sortPluginsAsc), tableHeaderBtnRightStyle, GUILayout.Width(110)))
             {
                 ToggleSort(1, ref sortPluginsCol, ref sortPluginsAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_peak_ms", 2, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.Width(100)))
+            if (GUILayout.Button(GetHeaderTitle("col_peak_ms", 2, sortPluginsCol, sortPluginsAsc), tableHeaderBtnRightStyle, GUILayout.Width(100)))
             {
                 ToggleSort(2, ref sortPluginsCol, ref sortPluginsAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_calls", 3, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.Width(100)))
+            if (GUILayout.Button(GetHeaderTitle("col_calls", 3, sortPluginsCol, sortPluginsAsc), tableHeaderBtnRightStyle, GUILayout.Width(90)))
             {
                 ToggleSort(3, ref sortPluginsCol, ref sortPluginsAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_pct_frame", 1, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.Width(110)))
+            if (GUILayout.Button(GetHeaderTitle("col_pct_frame", 1, sortPluginsCol, sortPluginsAsc), tableHeaderBtnRightStyle, GUILayout.Width(85)))
             {
                 ToggleSort(1, ref sortPluginsCol, ref sortPluginsAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_assembly", 4, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.Width(170)))
+            if (GUILayout.Button(GetHeaderTitle("col_assembly", 4, sortPluginsCol, sortPluginsAsc), tableHeaderBtnStyle, GUILayout.Width(160)))
             {
                 ToggleSort(4, ref sortPluginsCol, ref sortPluginsAsc);
             }
+            GUILayout.Space(16f); // Match scrollbar width
             GUILayout.EndHorizontal();
 
             scrollPosPlugins = GUILayout.BeginScrollView(scrollPosPlugins, false, false, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
@@ -1489,8 +1586,8 @@ namespace KSPPerformanceProfiler
                 bool isExp = expandedTypes.Contains(typeKey);
                 string expIcon = p.Methods.Count > 0 ? (isExp ? "▼ " : "▶ ") : "  ";
 
-                GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
-                if (GUILayout.Button(expIcon + displayTitle, headerStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
+                GUILayout.BeginHorizontal(i % 2 == 0 ? tableRowEvenStyle : tableRowOddStyle);
+                if (GUILayout.Button(expIcon + displayTitle, tableRowNameBtnStyle, GUILayout.MinWidth(200), GUILayout.ExpandWidth(true)))
                 {
                     if (p.Methods.Count > 0)
                     {
@@ -1499,16 +1596,11 @@ namespace KSPPerformanceProfiler
                     }
                 }
 
-                // Avg Ms + Micro Bar
-                GUILayout.BeginHorizontal(GUILayout.Width(110));
-                GUILayout.Label($"{p.DisplayMs:F2} ms", GUILayout.Width(62));
-                DrawMicroBar(p.DisplayMs, totalFrameMs, 40f);
-                GUILayout.EndHorizontal();
-
-                GUILayout.Label($"{p.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                GUILayout.Label($"{p.CurrentFrameCalls}", GUILayout.Width(100));
-                GUILayout.Label($"{pct:F1}%", GUILayout.Width(110));
-                GUILayout.Label($"{p.AssemblyName}", GUILayout.Width(170));
+                DrawTimeAndBarCell(p.DisplayMs, totalFrameMs, 110f);
+                GUILayout.Label($"{p.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+                GUILayout.Label($"{p.CurrentFrameCalls}", tableCellRight, GUILayout.Width(90));
+                GUILayout.Label($"{pct:F1}%", tableCellRight, GUILayout.Width(85));
+                GUILayout.Label($"{p.AssemblyName}", tableCellLeft, GUILayout.Width(160));
                 GUILayout.EndHorizontal();
 
                 if (isExp && p.Methods.Count > 0)
@@ -1518,16 +1610,15 @@ namespace KSPPerformanceProfiler
                         if (meth.SmoothMs < 0.0005 && meth.CurrentFrameCalls == 0) continue;
                         string mColor = meth.DisplayMs > 2.0 ? "#FF5555" : (meth.DisplayMs > 0.5 ? "#FFBB33" : "#88BBDD");
                         GUILayout.BeginHorizontal();
-                        GUILayout.Space(24);
-                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.MinWidth(216), GUILayout.ExpandWidth(true));
+                        GUILayout.Space(20);
+                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.MinWidth(180), GUILayout.ExpandWidth(true));
 
-                        GUILayout.BeginHorizontal(GUILayout.Width(110));
-                        GUILayout.Label($"{meth.DisplayMs:F2} ms", GUILayout.Width(62));
-                        DrawMicroBar(meth.DisplayMs, totalFrameMs, 40f);
-                        GUILayout.EndHorizontal();
-
-                        GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                        GUILayout.Label($"{meth.CurrentFrameCalls}", GUILayout.Width(100));
+                        DrawTimeAndBarCell(meth.DisplayMs, totalFrameMs, 110f);
+                        GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+                        GUILayout.Label($"{meth.CurrentFrameCalls}", tableCellRight, GUILayout.Width(90));
+                        double methPct = (meth.DisplayMs / totalFrameMs) * 100.0;
+                        GUILayout.Label($"{methPct:F1}%", tableCellRight, GUILayout.Width(85));
+                        GUILayout.Label("-", tableCellCenter, GUILayout.Width(160));
                         GUILayout.EndHorizontal();
                     }
                 }
@@ -1570,30 +1661,31 @@ namespace KSPPerformanceProfiler
 
             // Table Header with Sortable Buttons
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(GetHeaderTitle("col_module_type", 0, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
+            if (GUILayout.Button(GetHeaderTitle("col_module_type", 0, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.MinWidth(200), GUILayout.ExpandWidth(true)))
             {
                 ToggleSort(0, ref sortModulesCol, ref sortModulesAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_avg_ms", 1, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.Width(110)))
+            if (GUILayout.Button(GetHeaderTitle("col_avg_ms", 1, sortModulesCol, sortModulesAsc), tableHeaderBtnRightStyle, GUILayout.Width(110)))
             {
                 ToggleSort(1, ref sortModulesCol, ref sortModulesAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_peak_ms", 2, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.Width(100)))
+            if (GUILayout.Button(GetHeaderTitle("col_peak_ms", 2, sortModulesCol, sortModulesAsc), tableHeaderBtnRightStyle, GUILayout.Width(100)))
             {
                 ToggleSort(2, ref sortModulesCol, ref sortModulesAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_calls", 3, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.Width(100)))
+            if (GUILayout.Button(GetHeaderTitle("col_calls", 3, sortModulesCol, sortModulesAsc), tableHeaderBtnRightStyle, GUILayout.Width(90)))
             {
                 ToggleSort(3, ref sortModulesCol, ref sortModulesAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_pct_frame", 1, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.Width(110)))
+            if (GUILayout.Button(GetHeaderTitle("col_pct_frame", 1, sortModulesCol, sortModulesAsc), tableHeaderBtnRightStyle, GUILayout.Width(85)))
             {
                 ToggleSort(1, ref sortModulesCol, ref sortModulesAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_assembly", 4, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.Width(170)))
+            if (GUILayout.Button(GetHeaderTitle("col_assembly", 4, sortModulesCol, sortModulesAsc), tableHeaderBtnStyle, GUILayout.Width(160)))
             {
                 ToggleSort(4, ref sortModulesCol, ref sortModulesAsc);
             }
+            GUILayout.Space(16f); // Match scrollbar width
             GUILayout.EndHorizontal();
 
             scrollPosModules = GUILayout.BeginScrollView(scrollPosModules, false, false, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
@@ -1627,8 +1719,8 @@ namespace KSPPerformanceProfiler
                 bool isExp = expandedTypes.Contains(typeKey);
                 string expIcon = m.Methods.Count > 0 ? (isExp ? "▼ " : "▶ ") : "  ";
 
-                GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
-                if (GUILayout.Button($"{expIcon}<color={colorStr}>{m.TypeName}</color>", headerStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
+                GUILayout.BeginHorizontal(i % 2 == 0 ? tableRowEvenStyle : tableRowOddStyle);
+                if (GUILayout.Button($"{expIcon}<color={colorStr}>{m.TypeName}</color>", tableRowNameBtnStyle, GUILayout.MinWidth(200), GUILayout.ExpandWidth(true)))
                 {
                     if (m.Methods.Count > 0)
                     {
@@ -1637,16 +1729,11 @@ namespace KSPPerformanceProfiler
                     }
                 }
 
-                // Avg Ms + Micro Bar
-                GUILayout.BeginHorizontal(GUILayout.Width(110));
-                GUILayout.Label($"{m.DisplayMs:F2} ms", GUILayout.Width(62));
-                DrawMicroBar(m.DisplayMs, totalFrameMs, 40f);
-                GUILayout.EndHorizontal();
-
-                GUILayout.Label($"{m.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                GUILayout.Label($"{m.CurrentFrameCalls}", GUILayout.Width(100));
-                GUILayout.Label($"{pct:F1}%", GUILayout.Width(110));
-                GUILayout.Label($"{m.AssemblyName}", GUILayout.Width(170));
+                DrawTimeAndBarCell(m.DisplayMs, totalFrameMs, 110f);
+                GUILayout.Label($"{m.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+                GUILayout.Label($"{m.CurrentFrameCalls}", tableCellRight, GUILayout.Width(90));
+                GUILayout.Label($"{pct:F1}%", tableCellRight, GUILayout.Width(85));
+                GUILayout.Label($"{m.AssemblyName}", tableCellLeft, GUILayout.Width(160));
                 GUILayout.EndHorizontal();
 
                 if (isExp && m.Methods.Count > 0)
@@ -1656,16 +1743,15 @@ namespace KSPPerformanceProfiler
                         if (meth.SmoothMs < 0.0005 && meth.CurrentFrameCalls == 0) continue;
                         string mColor = meth.DisplayMs > 2.0 ? "#FF5555" : (meth.DisplayMs > 0.5 ? "#FFBB33" : "#88BBDD");
                         GUILayout.BeginHorizontal();
-                        GUILayout.Space(24);
-                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.MinWidth(216), GUILayout.ExpandWidth(true));
+                        GUILayout.Space(20);
+                        GUILayout.Label($"<color={mColor}>· {meth.MethodName}()</color>", tipStyle, GUILayout.MinWidth(180), GUILayout.ExpandWidth(true));
 
-                        GUILayout.BeginHorizontal(GUILayout.Width(110));
-                        GUILayout.Label($"{meth.DisplayMs:F2} ms", GUILayout.Width(62));
-                        DrawMicroBar(meth.DisplayMs, totalFrameMs, 40f);
-                        GUILayout.EndHorizontal();
-
-                        GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                        GUILayout.Label($"{meth.CurrentFrameCalls}", GUILayout.Width(100));
+                        DrawTimeAndBarCell(meth.DisplayMs, totalFrameMs, 110f);
+                        GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+                        GUILayout.Label($"{meth.CurrentFrameCalls}", tableCellRight, GUILayout.Width(90));
+                        double methPct = (meth.DisplayMs / totalFrameMs) * 100.0;
+                        GUILayout.Label($"{methPct:F1}%", tableCellRight, GUILayout.Width(85));
+                        GUILayout.Label("-", tableCellCenter, GUILayout.Width(160));
                         GUILayout.EndHorizontal();
                     }
                 }
@@ -1713,18 +1799,19 @@ namespace KSPPerformanceProfiler
 
             // Table Header with Sortable Buttons
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(GetHeaderTitle("col_part_title", 0, sortPartsCol, sortPartsAsc), tableHeaderBtnStyle, GUILayout.MinWidth(280), GUILayout.ExpandWidth(true)))
+            if (GUILayout.Button(GetHeaderTitle("col_part_title", 0, sortPartsCol, sortPartsAsc), tableHeaderBtnStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
             {
                 ToggleSort(0, ref sortPartsCol, ref sortPartsAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_vessel_name", 1, sortPartsCol, sortPartsAsc), tableHeaderBtnStyle, GUILayout.Width(320)))
+            if (GUILayout.Button(GetHeaderTitle("col_vessel_name", 1, sortPartsCol, sortPartsAsc), tableHeaderBtnStyle, GUILayout.Width(260)))
             {
                 ToggleSort(1, ref sortPartsCol, ref sortPartsAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_avg_ms", 2, sortPartsCol, sortPartsAsc), tableHeaderBtnStyle, GUILayout.Width(160)))
+            if (GUILayout.Button(GetHeaderTitle("col_avg_ms", 2, sortPartsCol, sortPartsAsc), tableHeaderBtnRightStyle, GUILayout.Width(140)))
             {
                 ToggleSort(2, ref sortPartsCol, ref sortPartsAsc);
             }
+            GUILayout.Space(16f); // Match scrollbar width
             GUILayout.EndHorizontal();
 
             scrollPosParts = GUILayout.BeginScrollView(scrollPosParts, false, false, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
@@ -1753,15 +1840,10 @@ namespace KSPPerformanceProfiler
                 PartStats p = topParts[i];
                 string colorStr = p.DisplayMs > 2.0 ? "#FF4444" : (p.DisplayMs > 0.8 ? "#FFAA22" : "#FFFFFF");
 
-                GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
-                GUILayout.Label($"<color={colorStr}>{p.PartTitle}</color>", headerStyle, GUILayout.MinWidth(280), GUILayout.ExpandWidth(true));
-                GUILayout.Label(p.VesselName, GUILayout.Width(320));
-
-                GUILayout.BeginHorizontal(GUILayout.Width(160));
-                GUILayout.Label($"{p.DisplayMs:F2} ms", GUILayout.Width(70));
-                DrawMicroBar(p.DisplayMs, totalFrameMs, 60f);
-                GUILayout.EndHorizontal();
-
+                GUILayout.BeginHorizontal(i % 2 == 0 ? tableRowEvenStyle : tableRowOddStyle);
+                GUILayout.Label($"<color={colorStr}>{p.PartTitle}</color>", tableRowNameBtnStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true));
+                GUILayout.Label(p.VesselName, tableCellLeft, GUILayout.Width(260f));
+                DrawTimeAndBarCell(p.DisplayMs, totalFrameMs, 140f);
                 GUILayout.EndHorizontal();
             }
 
@@ -1898,30 +1980,31 @@ namespace KSPPerformanceProfiler
 
             // === Table Header ===
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(GetHeaderTitle("col_assembly_name", 0, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
+            if (GUILayout.Button(GetHeaderTitle("col_assembly_name", 0, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnStyle, GUILayout.MinWidth(200), GUILayout.ExpandWidth(true)))
             {
                 ToggleSort(0, ref sortAssemblyCol, ref sortAssemblyAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_avg_ms", 1, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnStyle, GUILayout.Width(110)))
+            if (GUILayout.Button(GetHeaderTitle("col_avg_ms", 1, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnRightStyle, GUILayout.Width(110)))
             {
                 ToggleSort(1, ref sortAssemblyCol, ref sortAssemblyAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_peak_ms", 2, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnStyle, GUILayout.Width(100)))
+            if (GUILayout.Button(GetHeaderTitle("col_peak_ms", 2, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnRightStyle, GUILayout.Width(100)))
             {
                 ToggleSort(2, ref sortAssemblyCol, ref sortAssemblyAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_active_types", 3, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnStyle, GUILayout.Width(100)))
+            if (GUILayout.Button(GetHeaderTitle("col_active_types", 3, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnRightStyle, GUILayout.Width(90)))
             {
                 ToggleSort(3, ref sortAssemblyCol, ref sortAssemblyAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_total_calls", 4, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnStyle, GUILayout.Width(100)))
+            if (GUILayout.Button(GetHeaderTitle("col_total_calls", 4, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnRightStyle, GUILayout.Width(90)))
             {
                 ToggleSort(4, ref sortAssemblyCol, ref sortAssemblyAsc);
             }
-            if (GUILayout.Button(GetHeaderTitle("col_pct_frame", 5, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnStyle, GUILayout.Width(100)))
+            if (GUILayout.Button(GetHeaderTitle("col_pct_frame", 5, sortAssemblyCol, sortAssemblyAsc), tableHeaderBtnRightStyle, GUILayout.Width(85)))
             {
                 ToggleSort(5, ref sortAssemblyCol, ref sortAssemblyAsc);
             }
+            GUILayout.Space(16f); // Match scrollbar width
             GUILayout.EndHorizontal();
 
             // === Scrollable Assembly Table ===
@@ -1935,25 +2018,22 @@ namespace KSPPerformanceProfiler
 
                 string expandIcon = isExpanded ? "▼" : "▶";
 
-                GUILayout.BeginHorizontal(i % 2 == 0 ? "box" : GUIStyle.none);
+                GUILayout.BeginHorizontal(i % 2 == 0 ? tableRowEvenStyle : tableRowOddStyle);
 
                 // Clickable expand/collapse assembly name
-                if (GUILayout.Button($"{expandIcon} <color={colorStr}><b>{asm.AssemblyName}</b></color>", headerStyle, GUILayout.MinWidth(240), GUILayout.ExpandWidth(true)))
+                if (GUILayout.Button($"{expandIcon} <color={colorStr}><b>{asm.AssemblyName}</b></color>", tableRowNameBtnStyle, GUILayout.MinWidth(200), GUILayout.ExpandWidth(true)))
                 {
                     if (isExpanded)
                         expandedAssemblies.Remove(asm.AssemblyName);
                     else
                         expandedAssemblies.Add(asm.AssemblyName);
                 }
-                GUILayout.BeginHorizontal(GUILayout.Width(110));
-                GUILayout.Label($"{asm.DisplayMs:F2} ms", GUILayout.Width(62));
-                DrawMicroBar(asm.DisplayMs, totalFrameMs, 40f);
-                GUILayout.EndHorizontal();
 
-                GUILayout.Label($"{asm.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                GUILayout.Label($"{asm.ActiveTypeCount}", GUILayout.Width(100));
-                GUILayout.Label($"{asm.TotalCalls}", GUILayout.Width(100));
-                GUILayout.Label($"{asm.PctOfFrame:F1}%", GUILayout.Width(100));
+                DrawTimeAndBarCell(asm.DisplayMs, totalFrameMs, 110f);
+                GUILayout.Label($"{asm.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+                GUILayout.Label($"{asm.ActiveTypeCount}", tableCellRight, GUILayout.Width(90));
+                GUILayout.Label($"{asm.TotalCalls}", tableCellRight, GUILayout.Width(90));
+                GUILayout.Label($"{asm.PctOfFrame:F1}%", tableCellRight, GUILayout.Width(85));
                 GUILayout.EndHorizontal();
 
                 // === Expanded: Namespace sub-rows ===
@@ -1970,13 +2050,13 @@ namespace KSPPerformanceProfiler
                         string nsIcon = nsExpanded ? "  ▼" : "  ▶";
 
                         GUILayout.BeginHorizontal();
-                        GUILayout.Space(20);
+                        GUILayout.Space(16);
 
                         // Clickable namespace row
                         string nsDisplayName = ns.Namespace;
                         if (nsDisplayName.Length > 30) nsDisplayName = nsDisplayName.Substring(0, 27) + "...";
 
-                        if (GUILayout.Button($"{nsIcon} <color={nsColorStr}>{nsDisplayName}</color>", tipStyle, GUILayout.MinWidth(220), GUILayout.ExpandWidth(true)))
+                        if (GUILayout.Button($"{nsIcon} <color={nsColorStr}>{nsDisplayName}</color>", tipStyle, GUILayout.MinWidth(184), GUILayout.ExpandWidth(true)))
                         {
                             if (nsExpanded)
                                 expandedNamespaces.Remove(nsKey);
@@ -1984,15 +2064,11 @@ namespace KSPPerformanceProfiler
                                 expandedNamespaces.Add(nsKey);
                         }
 
-                        GUILayout.BeginHorizontal(GUILayout.Width(110));
-                        GUILayout.Label($"{ns.DisplayMs:F2} ms", GUILayout.Width(62));
-                        DrawMicroBar(ns.DisplayMs, totalFrameMs, 40f);
-                        GUILayout.EndHorizontal();
-
-                        GUILayout.Label($"{ns.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                        GUILayout.Label($"{ns.ActiveTypeCount}", GUILayout.Width(100));
-                        GUILayout.Label($"{ns.TotalCalls}", GUILayout.Width(100));
-                        GUILayout.Label($"{ns.PctOfFrame:F1}%", GUILayout.Width(100));
+                        DrawTimeAndBarCell(ns.DisplayMs, totalFrameMs, 110f);
+                        GUILayout.Label($"{ns.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+                        GUILayout.Label($"{ns.ActiveTypeCount}", tableCellRight, GUILayout.Width(90));
+                        GUILayout.Label($"{ns.TotalCalls}", tableCellRight, GUILayout.Width(90));
+                        GUILayout.Label($"{ns.PctOfFrame:F1}%", tableCellRight, GUILayout.Width(85));
                         GUILayout.EndHorizontal();
 
                         if (nsExpanded)
@@ -2011,29 +2087,25 @@ namespace KSPPerformanceProfiler
                                     string subColor = sub.DisplayMs > 2.0 ? "#FF8888" : (sub.DisplayMs > 0.5 ? "#FFDD66" : "#CCDDEE");
 
                                     GUILayout.BeginHorizontal();
-                                    GUILayout.Space(36);
-                                    if (GUILayout.Button($"<color={subColor}><b>{subIcon}{sub.DisplayName}</b></color>", tipStyle, GUILayout.MinWidth(204), GUILayout.ExpandWidth(true)))
+                                    GUILayout.Space(32);
+                                    if (GUILayout.Button($"<color={subColor}><b>{subIcon}{sub.DisplayName}</b></color>", tipStyle, GUILayout.MinWidth(168), GUILayout.ExpandWidth(true)))
                                     {
                                         if (subExp) expandedSubsystems.Remove(subKey);
                                         else expandedSubsystems.Add(subKey);
                                     }
 
-                                    GUILayout.BeginHorizontal(GUILayout.Width(110));
-                                    GUILayout.Label($"{sub.DisplayMs:F2} ms", GUILayout.Width(62));
-                                    DrawMicroBar(sub.DisplayMs, totalFrameMs, 40f);
-                                    GUILayout.EndHorizontal();
-
-                                    GUILayout.Label($"{sub.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                                    GUILayout.Label($"{sub.ActiveTypeCount}", GUILayout.Width(100));
-                                    GUILayout.Label($"{sub.TotalCalls}", GUILayout.Width(100));
-                                    GUILayout.Label($"{sub.PctOfFrame:F1}%", GUILayout.Width(100));
+                                    DrawTimeAndBarCell(sub.DisplayMs, totalFrameMs, 110f);
+                                    GUILayout.Label($"{sub.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+                                    GUILayout.Label($"{sub.ActiveTypeCount}", tableCellRight, GUILayout.Width(90));
+                                    GUILayout.Label($"{sub.TotalCalls}", tableCellRight, GUILayout.Width(90));
+                                    GUILayout.Label($"{sub.PctOfFrame:F1}%", tableCellRight, GUILayout.Width(85));
                                     GUILayout.EndHorizontal();
 
                                     if (subExp && sub.Types != null)
                                     {
                                         for (int k = 0; k < sub.Types.Count; k++)
                                         {
-                                            DrawTypeRowWithMethods(sub.Types[k], 54, subKey);
+                                            DrawTypeRowWithMethods(sub.Types[k], 48, subKey);
                                         }
                                     }
                                 }
@@ -2042,7 +2114,7 @@ namespace KSPPerformanceProfiler
                             {
                                 for (int k = 0; k < ns.Types.Count; k++)
                                 {
-                                    DrawTypeRowWithMethods(ns.Types[k], 40, nsKey);
+                                    DrawTypeRowWithMethods(ns.Types[k], 32, nsKey);
                                 }
                             }
                         }
@@ -2070,11 +2142,12 @@ namespace KSPPerformanceProfiler
             string typeIcon = hasMethods ? (typeExpanded ? "▼ " : "▶ ") : "· ";
 
             string tColorStr = t.DisplayMs > 2.0 ? "#FF5555" : (t.DisplayMs > 0.5 ? "#FFBB33" : "#88BBDD");
+            double totalFrameMs = Math.Max(0.001, ProfilerData.SmoothTotalFrameMs);
 
             GUILayout.BeginHorizontal();
             GUILayout.Space(indent);
 
-            int nameWidth = Math.Max(120, 240 - indent);
+            int nameWidth = Math.Max(120, 200 - indent);
             if (GUILayout.Button($"<color={tColorStr}>{typeIcon}{t.TypeName}</color>", tipStyle, GUILayout.MinWidth(nameWidth), GUILayout.ExpandWidth(true)))
             {
                 if (hasMethods)
@@ -2084,13 +2157,12 @@ namespace KSPPerformanceProfiler
                 }
             }
 
-            GUILayout.BeginHorizontal(GUILayout.Width(110));
-            GUILayout.Label($"{t.DisplayMs:F2} ms", GUILayout.Width(62));
-            DrawMicroBar(t.DisplayMs, ProfilerData.SmoothTotalFrameMs, 40f);
-            GUILayout.EndHorizontal();
-
-            GUILayout.Label($"{t.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-            GUILayout.Label(ProfilerI18n.Format("unit_calls", t.CurrentFrameCalls), GUILayout.Width(100));
+            DrawTimeAndBarCell(t.DisplayMs, totalFrameMs, 110f);
+            GUILayout.Label($"{t.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+            GUILayout.Label("-", tableCellCenter, GUILayout.Width(90));
+            GUILayout.Label(ProfilerI18n.Format("unit_calls", t.CurrentFrameCalls), tableCellRight, GUILayout.Width(90));
+            double typePct = (t.DisplayMs / totalFrameMs) * 100.0;
+            GUILayout.Label($"{typePct:F1}%", tableCellRight, GUILayout.Width(85));
             GUILayout.EndHorizontal();
 
             // Expanded methods
@@ -2111,7 +2183,7 @@ namespace KSPPerformanceProfiler
                     GUILayout.BeginHorizontal();
                     GUILayout.Space(indent + 16);
 
-                    int methWidth = Math.Max(100, 240 - indent - 16);
+                    int methWidth = Math.Max(100, 200 - indent - 16);
                     if (GUILayout.Button($"<color={mColor}>{methIcon}{meth.MethodName}()</color>", tipStyle, GUILayout.MinWidth(methWidth), GUILayout.ExpandWidth(true)))
                     {
                         if (hasSubs)
@@ -2121,13 +2193,12 @@ namespace KSPPerformanceProfiler
                         }
                     }
 
-                    GUILayout.BeginHorizontal(GUILayout.Width(110));
-                    GUILayout.Label($"{meth.DisplayMs:F2} ms", GUILayout.Width(62));
-                    DrawMicroBar(meth.DisplayMs, ProfilerData.SmoothTotalFrameMs, 40f);
-                    GUILayout.EndHorizontal();
-
-                    GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                    GUILayout.Label(ProfilerI18n.Format("unit_calls", meth.CurrentFrameCalls), GUILayout.Width(100));
+                    DrawTimeAndBarCell(meth.DisplayMs, totalFrameMs, 110f);
+                    GUILayout.Label($"{meth.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+                    GUILayout.Label("-", tableCellCenter, GUILayout.Width(90));
+                    GUILayout.Label(ProfilerI18n.Format("unit_calls", meth.CurrentFrameCalls), tableCellRight, GUILayout.Width(90));
+                    double methPct = (meth.DisplayMs / totalFrameMs) * 100.0;
+                    GUILayout.Label($"{methPct:F1}%", tableCellRight, GUILayout.Width(85));
                     GUILayout.EndHorizontal();
 
                     // Expanded Dispatcher Sub-Invocations (e.g. Principia inside TimingPre)
@@ -2144,16 +2215,15 @@ namespace KSPPerformanceProfiler
                             GUILayout.Space(indent + 32);
 
                             string subDisplay = $"⚡ <color=#00e5ff>[{sub.AssemblyName}]</color> {sub.TypeName}.{sub.MethodName}";
-                            int subWidth = Math.Max(140, 360 - indent - 32);
+                            int subWidth = Math.Max(140, 200 - indent - 32);
                             GUILayout.Label($"<color={sColor}>{subDisplay}</color>", tipStyle, GUILayout.MinWidth(subWidth), GUILayout.ExpandWidth(true));
 
-                            GUILayout.BeginHorizontal(GUILayout.Width(110));
-                            GUILayout.Label($"{sub.DisplayMs:F2} ms", GUILayout.Width(62));
-                            DrawMicroBar(sub.DisplayMs, ProfilerData.SmoothTotalFrameMs, 40f);
-                            GUILayout.EndHorizontal();
-
-                            GUILayout.Label($"{sub.DisplayPeakMs:F2} ms", GUILayout.Width(100));
-                            GUILayout.Label(ProfilerI18n.Format("unit_calls", sub.CurrentFrameCalls), GUILayout.Width(100));
+                            DrawTimeAndBarCell(sub.DisplayMs, totalFrameMs, 110f);
+                            GUILayout.Label($"{sub.DisplayPeakMs:F2} ms", tableCellRight, GUILayout.Width(100));
+                            GUILayout.Label("-", tableCellCenter, GUILayout.Width(90));
+                            GUILayout.Label(ProfilerI18n.Format("unit_calls", sub.CurrentFrameCalls), tableCellRight, GUILayout.Width(90));
+                            double subPct = (sub.DisplayMs / totalFrameMs) * 100.0;
+                            GUILayout.Label($"{subPct:F1}%", tableCellRight, GUILayout.Width(85));
                             GUILayout.EndHorizontal();
                         }
                     }
@@ -2291,7 +2361,7 @@ namespace KSPPerformanceProfiler
 
             // Row 1: Presets & One-click Recommendation
             GUILayout.BeginHorizontal();
-            GUILayout.Label("<b>预设梯度:</b>", tipStyle, GUILayout.Width(65));
+            GUILayout.Label("<b>预设:</b>", tipStyle, GUILayout.Width(45));
 
             int[] presets = new int[] { 1024, 2048, 4096, 6144 };
             for (int i = 0; i < presets.Length; i++)
@@ -2302,8 +2372,8 @@ namespace KSPPerformanceProfiler
                 Color prevBg = GUI.backgroundColor;
                 if (isCurrent) GUI.backgroundColor = new Color(0.2f, 0.9f, 0.5f, 1f);
 
-                string btnText = ProfilerI18n.Format("pad_btn_preset", mb, mb / 1024);
-                if (GUILayout.Button(btnText, GUILayout.Width(135), GUILayout.Height(25)))
+                string btnText = $"+{mb / 1024} GB ({mb}M)";
+                if (GUILayout.Button(btnText, GUILayout.Height(25)))
                 {
                     MonoHeapPadder.TargetPadMb = mb;
                     customPadMbInput = mb.ToString();
@@ -2311,13 +2381,17 @@ namespace KSPPerformanceProfiler
                     MonoHeapPadder.Pad(mb);
                 }
                 GUI.backgroundColor = prevBg;
-                GUILayout.Space(4);
             }
+
+            GUILayout.Space(8);
 
             // Quick Apply Recommended Value
             Color prevBgRec = GUI.backgroundColor;
             GUI.backgroundColor = new Color(0.3f, 0.85f, 0.95f, 1f);
-            if (GUILayout.Button(ProfilerI18n.Format("pad_btn_use_rec", recMb), GUILayout.Width(170), GUILayout.Height(25)))
+            string recLabel = ProfilerI18n.IsChinese 
+                ? $"★ 应用推荐值 (+{recMb} MB)" 
+                : $"★ Apply Recommended (+{recMb} MB)";
+            if (GUILayout.Button(recLabel, GUILayout.Height(25)))
             {
                 MonoHeapPadder.TargetPadMb = recMb;
                 customPadMbInput = recMb.ToString();
@@ -2326,21 +2400,20 @@ namespace KSPPerformanceProfiler
             }
             GUI.backgroundColor = prevBgRec;
 
-            GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
             GUILayout.Space(6);
 
-            // Row 2: Manual Custom Value Input with Quick Steppers
+            // Row 2A: Manual Custom Value Input with Quick Steppers
             if (string.IsNullOrEmpty(customPadMbInput))
             {
                 customPadMbInput = (MonoHeapPadder.TargetPadMb > 0 ? MonoHeapPadder.TargetPadMb : recMb).ToString();
             }
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label($"<b>{ProfilerI18n.Get("pad_custom_label")}</b>", tipStyle, GUILayout.Width(155));
+            GUILayout.Label($"<b>{ProfilerI18n.Get("pad_custom_label")}</b>", tipStyle, GUILayout.Width(130));
 
-            if (GUILayout.Button("-1024", GUILayout.Width(50), GUILayout.Height(24)))
+            if (GUILayout.Button("-1024", GUILayout.Width(48), GUILayout.Height(24)))
             {
                 if (int.TryParse(customPadMbInput, out int curVal))
                 {
@@ -2355,7 +2428,7 @@ namespace KSPPerformanceProfiler
                 }
             }
 
-            customPadMbInput = GUILayout.TextField(customPadMbInput, GUILayout.Width(75), GUILayout.Height(24));
+            customPadMbInput = GUILayout.TextField(customPadMbInput, GUILayout.Width(70), GUILayout.Height(24));
 
             if (GUILayout.Button("+512", GUILayout.Width(45), GUILayout.Height(24)))
             {
@@ -2364,7 +2437,7 @@ namespace KSPPerformanceProfiler
                     customPadMbInput = Math.Min(maxSafeMb, curVal + 512).ToString();
                 }
             }
-            if (GUILayout.Button("+1024", GUILayout.Width(50), GUILayout.Height(24)))
+            if (GUILayout.Button("+1024", GUILayout.Width(48), GUILayout.Height(24)))
             {
                 if (int.TryParse(customPadMbInput, out int curVal))
                 {
@@ -2377,7 +2450,7 @@ namespace KSPPerformanceProfiler
             // Apply Custom Value Button
             Color prevBgApply = GUI.backgroundColor;
             GUI.backgroundColor = new Color(0.2f, 0.9f, 0.5f, 1f);
-            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_custom_apply")}</b>", GUILayout.Width(150), GUILayout.Height(25)))
+            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_custom_apply")}</b>", GUILayout.Height(25)))
             {
                 if (int.TryParse(customPadMbInput, out int val) && val >= 256 && val <= maxSafeMb)
                 {
@@ -2392,28 +2465,32 @@ namespace KSPPerformanceProfiler
             }
             GUI.backgroundColor = prevBgApply;
 
+            GUILayout.EndHorizontal();
+
             GUILayout.Space(6);
 
-            // Release Padding Button (if active)
-            if (MonoHeapPadder.IsPadded)
-            {
-                Color prevBgRel = GUI.backgroundColor;
-                GUI.backgroundColor = new Color(1f, 0.5f, 0.3f, 1f);
-                if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_btn_release")}</b>", GUILayout.Width(100), GUILayout.Height(25)))
-                {
-                    MonoHeapPadder.ReleasePadding();
-                }
-                GUI.backgroundColor = prevBgRel;
-                GUILayout.Space(6);
-            }
+            // Row 2B: Maintenance & Memory Release
+            GUILayout.BeginHorizontal();
 
             // Force GC Button
-            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_force_gc")}</b>", GUILayout.Width(220), GUILayout.Height(25)))
+            if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_force_gc")}</b>", GUILayout.Height(25)))
             {
                 MonoHeapPadder.ForceGarbageCollection();
             }
 
-            GUILayout.FlexibleSpace();
+            // Release Padding Button (if active)
+            if (MonoHeapPadder.IsPadded)
+            {
+                GUILayout.Space(6);
+                Color prevBgRel = GUI.backgroundColor;
+                GUI.backgroundColor = new Color(1f, 0.5f, 0.3f, 1f);
+                if (GUILayout.Button($"<b>{ProfilerI18n.Get("pad_btn_release")}</b>", GUILayout.Height(25)))
+                {
+                    MonoHeapPadder.ReleasePadding();
+                }
+                GUI.backgroundColor = prevBgRel;
+            }
+
             GUILayout.EndHorizontal();
 
             // Validation warning line if input out of bounds
