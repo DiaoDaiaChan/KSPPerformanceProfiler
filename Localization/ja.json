@@ -206,6 +206,12 @@
     "graph_axis_60": "16.7ms (60F)",
     "graph_axis_30": "33.3ms (30F)",
     "graph_axis_20": "50.0ms (20F)",
-    "window_size_info": "📐 {0:F0}×{1:F0}"
+    "window_size_info": "📐 {0:F0}×{1:F0}",
+    "legend_spikes": "スパイク",
+    "graph_hover_frames_ago": "-{0} フレーム",
+    "lang_btn_reload": "🔄 言語パックを再スキャン",
+    "pad_presets_label": "プリセット:",
+    "pad_btn_apply_rec": "★ 推奨値を適用 (+{0} MB)",
+    "pad_msg_reminder": "💡 ヒープパッダー利用可能: {1} GB RAM に対して {0} MB を推奨します。設定タブを開くか Alt+End を押してください。"
   }
 }

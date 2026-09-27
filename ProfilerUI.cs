@@ -973,7 +973,7 @@ namespace KSPPerformanceProfiler
                 }
 
                 GUILayout.Space(8);
-                GUILayout.Label("<color=#ff5555>▼</color> 尖峰", tipStyle);
+                GUILayout.Label($"<color=#ff5555>▼</color> {ProfilerI18n.Get("legend_spikes")}", tipStyle);
                 GUILayout.Space(4);
                 GUILayout.Label("<color=#ff8800>◆</color> GC", tipStyle);
             }
@@ -1263,13 +1263,14 @@ namespace KSPPerformanceProfiler
                 GUILayout.BeginHorizontal("box");
 
                 string lockTag = lockedTimelineIdx >= 0 ? ProfilerI18n.Get("graph_hover_locked") : ProfilerI18n.Get("graph_hover_tracking");
-                GUILayout.Label($"{lockTag} <b>-{framesAgo} 帧</b> ({hTotal:F1}ms, {hFps:F1} FPS)", headerStyle, GUILayout.Width(220));
+                string framesAgoStr = ProfilerI18n.Format("graph_hover_frames_ago", framesAgo);
+                GUILayout.Label($"{lockTag} <b>{framesAgoStr}</b> ({hTotal:F1}ms, {hFps:F1} FPS)", headerStyle, GUILayout.Width(220));
 
-                GUILayout.Label($"<color=#00d2d3>■</color> 模块: {hMod:F1}ms ({(hMod / hTotal * 100):F0}%)", tipStyle);
-                GUILayout.Label($"<color=#a29bfe>■</color> 插件: {hPlugin:F1}ms ({(hPlugin / hTotal * 100):F0}%)", tipStyle);
-                GUILayout.Label($"<color=#ff9f43>■</color> 物理: {hPhysx:F1}ms ({(hPhysx / hTotal * 100):F0}%)", tipStyle);
-                GUILayout.Label($"<color=#feca57>■</color> GPU: {hGpu:F1}ms ({(hGpu / hTotal * 100):F0}%)", tipStyle);
-                GUILayout.Label($"<color=#8395a7>■</color> 调度: {hOverhead:F1}ms ({(hOverhead / hTotal * 100):F0}%)", tipStyle);
+                GUILayout.Label($"<color=#00d2d3>■</color> {ProfilerI18n.Get("legend_modules")}: {hMod:F1}ms ({(hMod / hTotal * 100):F0}%)", tipStyle);
+                GUILayout.Label($"<color=#a29bfe>■</color> {ProfilerI18n.Get("legend_plugins")}: {hPlugin:F1}ms ({(hPlugin / hTotal * 100):F0}%)", tipStyle);
+                GUILayout.Label($"<color=#ff9f43>■</color> {ProfilerI18n.Get("legend_physx")}: {hPhysx:F1}ms ({(hPhysx / hTotal * 100):F0}%)", tipStyle);
+                GUILayout.Label($"<color=#feca57>■</color> {ProfilerI18n.Get("legend_gpu")}: {hGpu:F1}ms ({(hGpu / hTotal * 100):F0}%)", tipStyle);
+                GUILayout.Label($"<color=#8395a7>■</color> {ProfilerI18n.Get("legend_overhead")}: {hOverhead:F1}ms ({(hOverhead / hTotal * 100):F0}%)", tipStyle);
 
                 if (hSpike)
                 {
@@ -2271,7 +2272,7 @@ namespace KSPPerformanceProfiler
             GUILayout.BeginHorizontal();
             GUILayout.Label($"<b>🌐 {ProfilerI18n.Get("lang_label")} ({ProfilerI18n.AvailablePacks.Count})</b>", headerStyle);
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button(ProfilerI18n.IsChinese ? "🔄 重新扫描语言包" : "🔄 Reload Language Packs", GUILayout.Height(22)))
+            if (GUILayout.Button(ProfilerI18n.Get("lang_btn_reload"), GUILayout.Height(22)))
             {
                 ProfilerI18n.ReloadLanguagePacks();
             }
@@ -2361,7 +2362,7 @@ namespace KSPPerformanceProfiler
 
             // Row 1: Presets & One-click Recommendation
             GUILayout.BeginHorizontal();
-            GUILayout.Label("<b>预设:</b>", tipStyle, GUILayout.Width(45));
+            GUILayout.Label($"<b>{ProfilerI18n.Get("pad_presets_label")}</b>", tipStyle, GUILayout.Width(50));
 
             int[] presets = new int[] { 1024, 2048, 4096, 6144 };
             for (int i = 0; i < presets.Length; i++)
@@ -2388,9 +2389,7 @@ namespace KSPPerformanceProfiler
             // Quick Apply Recommended Value
             Color prevBgRec = GUI.backgroundColor;
             GUI.backgroundColor = new Color(0.3f, 0.85f, 0.95f, 1f);
-            string recLabel = ProfilerI18n.IsChinese 
-                ? $"★ 应用推荐值 (+{recMb} MB)" 
-                : $"★ Apply Recommended (+{recMb} MB)";
+            string recLabel = ProfilerI18n.Format("pad_btn_apply_rec", recMb);
             if (GUILayout.Button(recLabel, GUILayout.Height(25)))
             {
                 MonoHeapPadder.TargetPadMb = recMb;

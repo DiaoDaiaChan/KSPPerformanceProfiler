@@ -206,6 +206,12 @@
     "graph_axis_60": "16.7ms (60F)",
     "graph_axis_30": "33.3ms (30F)",
     "graph_axis_20": "50.0ms (20F)",
-    "window_size_info": "📐 {0:F0}×{1:F0}"
+    "window_size_info": "📐 {0:F0}×{1:F0}",
+    "legend_spikes": "Пики",
+    "graph_hover_frames_ago": "-{0} кадров",
+    "lang_btn_reload": "🔄 Пересканировать языки",
+    "pad_presets_label": "Пресеты:",
+    "pad_btn_apply_rec": "★ Применить реком. (+{0} МБ)",
+    "pad_msg_reminder": "💡 Расширение кучи готово: рекомендуется {0} МБ для ваших {1} ГБ ОЗУ. Откройте настройки или нажмите Alt+End."
   }
 }

@@ -140,7 +140,7 @@ namespace KSPPerformanceProfiler
                 {
                     int recMb = RecommendedPadMb;
                     ScreenMessages.PostScreenMessage(
-                        $"[KSPPerformanceProfiler] 💡 Heap Padder available: recommend {recMb} MB for your {SystemRamMb / 1024} GB RAM. Open Settings tab or press Alt+End to apply.",
+                        $"[KSPPerformanceProfiler] {ProfilerI18n.Format("pad_msg_reminder", recMb, SystemRamMb / 1024)}",
                         8.0f,
                         ScreenMessageStyle.UPPER_CENTER
                     );

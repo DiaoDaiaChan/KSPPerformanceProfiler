@@ -16,7 +16,6 @@
     "lang_auto": "Auto",
     "lang_zh": "简体中文",
     "lang_en": "English",
-
     "metric_ptr": "Physics Ratio (PTR)",
     "metric_fps": "Real-time FPS",
     "metric_avg_fps": "Avg FPS",
@@ -30,7 +29,6 @@
     "metric_gpu_render": "GPU / Render Pipeline",
     "metric_camera": "Camera Render Calls",
     "metric_overhead": "Engine Overhead",
-
     "tab_graph": "📊 Performance & Stutters",
     "tab_dashboard": "📊 Performance & Stutters",
     "tab_scripts": "🧩 Mod Plugins & Scripts",
@@ -40,10 +38,8 @@
     "tab_assembly": "🌳 Deep Assembly & Dispatch",
     "tab_settings": "💡 Guide & Settings",
     "tab_help": "📖 Bottlenecks & Guide",
-
     "subtab_plugins": "● Global Plugins (by Mod)",
     "subtab_modules": "● Part Modules (PartModules)",
-
     "hero_killer_title": "Core Performance Diagnosis",
     "hero_top_culprits": "Primary Lag Culprits:",
     "hero_auto_freeze_on": "⚡ Auto-Freeze on Spike: ON",
@@ -55,7 +51,6 @@
     "hero_status_optimal": "🟢 Smooth & Optimal",
     "hero_status_warning": "⚠️ Performance Bottleneck",
     "hero_status_critical": "🚨 Severe Lag Spike",
-
     "col_plugin_class": "Plugin Manager Class",
     "col_module_type": "PartModule Type",
     "col_part_title": "Part Title",
@@ -89,29 +84,23 @@
     "subsys_other": "🧩 Other Global",
     "col_method_name": "Method / Sub-Invocation",
     "dispatcher_tag": "⚡ Dispatcher",
-
     "bn_title": "Smart Bottleneck Diagnostics",
     "bn_top_culprits": "Top Performance Consumers (Top Offenders):",
     "bn_smooth_title": "🟢 Perfectly Smooth (No Severe Bottleneck)",
     "bn_smooth_desc": "Physics simulation is at full rate (PTR 100%), frame rate is stable, and jitter is minimal.",
     "bn_smooth_tip": "System performance is optimal under the current flight condition and vessel size.",
-
     "bn_physx_title": "🛑 Physics Engine & Joint Overload (PhysX & Joints Bound)",
     "bn_physx_desc": "Physics calculation is exceeding frame budget ({0:F1}ms), PTR dropped to {1:F1}% (Yellow/Red simulation clock).",
     "bn_physx_tip": "Main causes: Too many parts on active vessel, excessive AutoStruts, complex docking/collision meshes. Suggestions: Simplify vessel parts, reduce autostrut usage, install KSPCommunityFixes.",
-
     "bn_plugin_title": "🛑 Global Mod Plugin Script Overload (Mod Plugin Overhead)",
     "bn_plugin_desc": "External Mod Plugin Managers are consuming {0:F1}ms per frame ({1:F1}% of frame budget).",
     "bn_plugin_tip": "Inspect the 'Global Plugins' tab to locate the heaviest mods (e.g. Scatterer, EVE, Principia, background simulations).",
-
     "bn_module_title": "🛑 PartModule Script Overload (PartModule Script Bound)",
     "bn_module_desc": "Vessel PartModule scripts are taking {0:F1}ms per frame ({1:F1}% of frame budget).",
     "bn_module_tip": "Specific modules on your vessel (e.g., Waterfall visual effects, FAR aerodynamics, resource converters) are consuming significant CPU cycles.",
-
     "bn_gpu_title": "🛑 GPU Graphics & Shaders Bottleneck (GPU / Render Bound)",
     "bn_gpu_desc": "GPU rendering and draw wait is taking {0:F1}ms ({1:F1}% of frame budget), while CPU scripts are lightweight.",
     "bn_gpu_tip": "Main causes: High display resolution, heavy post-processing (TUFX/anti-aliasing), Parallax terrain shaders, volumetric clouds. Suggestions: Lower shadow cascade distance or antialiasing.",
-
     "bn_tufx_title": "🛑 Heavy TUFX Post-Processing Overhead",
     "bn_tufx_desc": "TUFX post-processing takes {0:F1}ms ({1:F1}% of frame), running {2} active effect passes.",
     "bn_tufx_tip": "Consider disabling heavy screen-space passes (GTAO, SSGI, SSR) or lowering AA level (TAA/SMAA) in TUFX profile settings. Press F11 anytime to toggle Master Bypass and benchmark vanilla performance.",
@@ -119,18 +108,15 @@
     "tufx_active_passes": "Active Passes",
     "tufx_post_process_ms": "Post-Process Time",
     "tufx_cpu_build_ms": "Camera Record Time",
-
     "bn_stutter_title": "⚠️ Severe Micro-Stutters & Jitter (Micro-Stutter / GC Spikes)",
     "bn_stutter_desc": "Average FPS is {0:F1}, but 1% Low plummeted to {1:F1} FPS with high jitter ({2:F1}ms).",
     "bn_stutter_tip": "Main causes: Unity Mono garbage collection (GC) pauses or cyclic mod routines. Suggestions: Click [Quick Pad Heap] below or pad 2-4GB in Optimization Settings to significantly delay GC pauses!",
-
     "budget_bar_title": "Frame Time Budget Breakdown",
     "legend_modules": "PartModules",
     "legend_plugins": "Plugins",
     "legend_physx": "PhysX / Joints",
     "legend_gpu": "GPU / Render",
     "legend_overhead": "Overhead",
-
     "graph_title": "Real-time Frame Time History (Last 100 Frames) - Spikes indicate micro-stutters",
     "graph_baseline_60": "60 FPS Target (16.6ms)",
     "graph_baseline_30": "30 FPS Minimum (33.3ms)",
@@ -139,7 +125,6 @@
     "graph_legend_yellow": "🟡 Mild Variation (33~50ms)",
     "graph_legend_red": "🔴 Heavy Stutter (>50ms)",
     "graph_phase_metrics": "Low-Level Engine Phase Metrics",
-
     "help_h1": "Performance Metrics & Troubleshooting Guide",
     "help_ptr_q": "What is PTR (Physics Time Ratio)?",
     "help_ptr_a": "• 100% (Green): 1 sec in physics = 1 sec in real world.\n• <80% (Yellow): Physics is lagging; game clock turns yellow and slow-motion occurs.\n• <50% (Red): CPU physics thread is fully saturated; vessel simplification required.",
@@ -149,18 +134,15 @@
     "help_jitter_a": "• Standard deviation of frame times. Below 2ms is exceptionally smooth; above 6ms causes prominent tearing and uneven pacing.",
     "help_mod_tuning_q": "Mod Optimization Tips:",
     "help_mod_tuning_a": "1. Physics Lag: Install KSPCommunityFixes and avoid excessive AutoStruts.\n2. GC Hitching: Use this mod's built-in [Mono Heap Padder] (Hotkey: Alt+End) to pad 2-4GB virtual heap, extending GC pause intervals from seconds to dozens of minutes.\n3. GPU Lag: Tweak Scatterer / TUFX antialiasing and Parallax terrain tessellation settings.",
-
     "msg_report_saved": "Performance diagnostic report saved to:\nGameData/KSPPerformanceProfiler/Logs/{0}",
     "msg_report_fail": "Failed to save performance report: {0}",
     "msg_ui_opened": "Performance Profiler window opened",
     "msg_ui_closed": "Performance Profiler window closed",
     "msg_hud_opened": "Switched to Mini Profiler HUD",
-
     "sort_lock_on": "⏸️ Lock Sort",
     "sort_lock_off": "🔄 Dynamic Sort",
     "sort_refresh_now": "🔄 Re-sort Now",
     "sort_lock_tip": "Freeze row order to prevent jitter; values update smoothly in-place",
-
     "spike_card_title": "⚡ Stutter Spike Sniffer (Instant Root Cause)",
     "spike_none": "No freeze spikes detected yet (Smooth operation)",
     "spike_history_count": "Spike Log ({0}/{1})",
@@ -177,7 +159,6 @@
     "spike_clear": "🗑️ Clear Log",
     "spike_unfreeze": "▶ Unfreeze",
     "spike_frozen_banner": "⏸️ Profiler is Frozen! Click 'Unfreeze' to resume real-time metrics",
-
     "graph_mode_stacked": "📊 Stacked Budget Timeline",
     "graph_mode_curve": "📈 Framerate & 1% Low Curve",
     "graph_scale_label": "Time Window:",
@@ -187,7 +168,6 @@
     "graph_curve_fps": "Realtime FPS",
     "graph_curve_1pct": "1% Low FPS",
     "graph_spike_marker_tip": "Red ▼ markers indicate freeze spikes. Click to inspect culprit details.",
-
     "asm_bar_title": "Assembly (Mod DLL) Frame Time Share",
     "bn_btn_hide_advice": "▲ Hide Advice",
     "bn_btn_show_advice": "▼ Show Advice",
@@ -197,7 +177,6 @@
     "culprit_gpu": "GPU Shaders & Render Wait",
     "culprit_mono_gc": "Mono GC (Garbage Collection)",
     "culprit_physx_joints": "PhysX Joints & Collisions",
-
     "pad_card_title": "⚡ Mono Heap Padder & GC Stutter Management",
     "pad_card_desc": "Pre-allocates managed heap headroom to eliminate periodic Mono GC Stop-The-World stutters!",
     "pad_ram_banner": "🖥️ <b>System Physical RAM:</b> {0} GB ({1} MB) | <b>Recommended Padding:</b> <color=#33FF33><b>+{2} MB (+{3} GB)</b></color> (Safe Max: {4} MB)",
@@ -220,7 +199,6 @@
     "pad_hero_advice": "GC pause stutter detected! Free headroom is low. Click Quick Pad Heap to eliminate GC spikes!",
     "pad_hero_btn": "⚡ Quick Pad Heap",
     "pad_msg_gc_freed": "[KSPPerformanceProfiler] 🧹 Manual GC complete! Reclaimed ~{0} MB managed memory (Current free: {1:F0} MB)",
-
     "graph_unlock_btn": "✕ Unlock",
     "graph_hover_locked": "🔒 [Locked Frame]",
     "graph_hover_tracking": "🔍 [Inspecting]",
@@ -228,6 +206,12 @@
     "graph_axis_60": "16.7ms (60F)",
     "graph_axis_30": "33.3ms (30F)",
     "graph_axis_20": "50.0ms (20F)",
-    "window_size_info": "📐 {0:F0}×{1:F0}"
+    "window_size_info": "📐 {0:F0}×{1:F0}",
+    "legend_spikes": "Spikes",
+    "graph_hover_frames_ago": "-{0} frames",
+    "lang_btn_reload": "🔄 Reload Language Packs",
+    "pad_presets_label": "Presets:",
+    "pad_btn_apply_rec": "★ Apply Recommended (+{0} MB)",
+    "pad_msg_reminder": "💡 Heap Padder available: recommend {0} MB for your {1} GB RAM. Open Settings tab or press Alt+End to apply."
   }
 }

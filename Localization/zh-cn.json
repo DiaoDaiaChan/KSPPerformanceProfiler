@@ -16,7 +16,6 @@
     "lang_auto": "自动",
     "lang_zh": "简体中文",
     "lang_en": "English",
-
     "metric_ptr": "物理实速比 (PTR)",
     "metric_fps": "实时帧率 (FPS)",
     "metric_avg_fps": "平均帧率",
@@ -30,7 +29,6 @@
     "metric_gpu_render": "GPU/渲染管线",
     "metric_camera": "相机渲染调用",
     "metric_overhead": "引擎调度与其他",
-
     "tab_graph": "📊 性能波形与掉帧抓拍",
     "tab_dashboard": "📊 性能看板与掉帧抓拍",
     "tab_scripts": "🧩 Mod 脚本与模块排行",
@@ -40,10 +38,8 @@
     "tab_assembly": "🌳 底层深挖与程序集",
     "tab_settings": "💡 优化指南与系统设置",
     "tab_help": "📖 瓶颈与排错指南",
-
     "subtab_plugins": "● 全局 Mod 插件 (按库聚合)",
     "subtab_modules": "● 部件模块 (PartModules)",
-
     "hero_killer_title": "核心性能诊断",
     "hero_top_culprits": "当前致卡主犯:",
     "hero_auto_freeze_on": "⚡ 掉帧自动冻结: 开",
@@ -55,7 +51,6 @@
     "hero_status_optimal": "🟢 运行极度流畅",
     "hero_status_warning": "⚠️ 存在性能瓶颈",
     "hero_status_critical": "🚨 严重掉帧卡顿",
-
     "col_plugin_class": "插件管理器类名",
     "col_module_type": "部件模块类型",
     "col_part_title": "零件名称",
@@ -89,29 +84,23 @@
     "subsys_other": "🧩 其他全局核心 (Other Global)",
     "col_method_name": "执行方法 / 委托回调",
     "dispatcher_tag": "⚡ 调度器穿透",
-
     "bn_title": "智能瓶颈诊断",
     "bn_top_culprits": "主要性能消耗源 (Top Offenders):",
     "bn_smooth_title": "🟢 运行极度流畅 (无明显瓶颈)",
     "bn_smooth_desc": "当前物理时钟满速 (PTR 100%)，帧率平稳且抖动极低，系统性能处于理想状态。",
     "bn_smooth_tip": "当前配置与载具规模表现优秀，可维持现有画质与部件规模。",
-
     "bn_physx_title": "🛑 物理引擎与关节过载 (PhysX & Joints Bound)",
     "bn_physx_desc": "物理计算严重超时 (耗时 {0:F1}ms)，物理实速比降至 {1:F1}% (游戏出现黄/红时钟减速)。",
     "bn_physx_tip": "主要原因：载具零件数过多、AutoStrut 刚化过度、复杂对接/碰撞解算。建议：精简零件数量、安装 KSP-Recall/KSPCommunityFixes 优化物理关节、避免过量自动刚化。",
-
     "bn_plugin_title": "🛑 全局 Mod 插件脚本过载 (Mod Plugin Overhead)",
     "bn_plugin_desc": "外部 Mod 插件管理器脚本每帧占用 {0:F1}ms (占总帧时间的 {1:F1}%)，严重拖累帧率。",
     "bn_plugin_tip": "请在下方【全局插件管理器】标签页查看耗时最高的 Mod，常见原因：Scatterer/EVE 大规模更新、Principia 高精度引力步进、未优化的后台计算插件。",
-
     "bn_module_title": "🛑 部件模块脚本过载 (PartModule Script Bound)",
     "bn_module_desc": "载具上的 PartModule 脚本每帧占用 {0:F1}ms (占总帧时间的 {1:F1}%)。",
     "bn_module_tip": "载具上某个部件模块（如 Waterfall 发动机特效、FAR 复杂气动计算、资源转化器）正在占用过多 CPU 周期。可查看【PartModule 耗时】标签页定位具体模块。",
-
     "bn_gpu_title": "🛑 GPU 显卡渲染或着色器瓶颈 (GPU / Render Bound)",
     "bn_gpu_desc": "GPU 渲染与显卡等待耗时 {0:F1}ms (占总帧时间的 {1:F1}%)，CPU 脚本耗时正常但显卡满载。",
     "bn_gpu_tip": "主要原因：分辨率过高、TUFX 后处理抗锯齿、Parallax 地表细分/置换贴图、体积云着色器。建议：适当调低抗锯齿、地表曲面细分质量或阴影级联距离。",
-
     "bn_tufx_title": "🛑 TUFX 画面后处理负载过高 (TUFX Post-Processing Bound)",
     "bn_tufx_desc": "TUFX 画面后处理耗时 {0:F1}ms (占总帧时间的 {1:F1}%)，当前运行了 {2} 个特效通道。",
     "bn_tufx_tip": "建议在 TUFX 设置中关闭重型计算通道（如 GTAO 环境光遮蔽、SSGI 屏幕全局光照、SSR 反射），或调低抗锯齿级别 (TAA/SMAA)；游戏中可随时按 F11 开启 Master Bypass 完全绕过 TUFX 对比基准。",
@@ -119,18 +108,15 @@
     "tufx_active_passes": "激活通道数",
     "tufx_post_process_ms": "后处理耗时",
     "tufx_cpu_build_ms": "相机指令录制",
-
     "bn_stutter_title": "⚠️ 严重微卡顿与帧时间抖动 (Micro-Stutter / GC Spikes)",
     "bn_stutter_desc": "虽然平均帧率为 {0:F1} FPS，但 1% Low 跌至 {1:F1} FPS，帧抖动高达 {2:F1}ms。",
     "bn_stutter_tip": "主要原因：Unity Mono 堆内存频繁垃圾回收 (GC Collect) 或特定 Mod 周期性突发计算。建议：点击下方【一键垫高堆内存】或在【优化设置】中垫高 2~4GB 堆内存，彻底延缓 GC 触发间隔！",
-
     "budget_bar_title": "宏观帧时间预算占比 (Frame Time Budget)",
     "legend_modules": "部件模块",
     "legend_plugins": "全局插件",
     "legend_physx": "物理解算",
     "legend_gpu": "GPU与渲染",
     "legend_overhead": "引擎调度",
-
     "graph_title": "实时帧生成时间历史 (最近 100 帧) - 尖峰表示微卡顿 (Spikes)",
     "graph_baseline_60": "60 FPS 理想线 (16.6ms)",
     "graph_baseline_30": "30 FPS 流畅线 (33.3ms)",
@@ -139,7 +125,6 @@
     "graph_legend_yellow": "🟡 轻微波动 (33~50ms)",
     "graph_legend_red": "🔴 严重卡顿 (>50ms)",
     "graph_phase_metrics": "底层引擎各阶段耗时",
-
     "help_h1": "KSP 性能指标详解与排错指南",
     "help_ptr_q": "什么是 PTR (物理实速比 Physics Time Ratio)？",
     "help_ptr_a": "• 100% (绿色)：物理仿真 1 秒 = 真实世界 1 秒。\n• <80% (黄色)：物理计算开始吃力，游戏时钟变黄，出现慢动作。\n• <50% (红色)：CPU 单核物理线程严重过载，必须精简载具零件或减少碰撞体。",
@@ -149,18 +134,15 @@
     "help_jitter_a": "• 衡量前后两帧耗时的方差标准差。低于 2ms 表示帧生成极其均匀平稳；高于 6ms 表示帧时间起伏巨大，画面撕裂与跳帧明显。",
     "help_mod_tuning_q": "常见 Mod 优化建议：",
     "help_mod_tuning_a": "1. 物理卡顿：使用 KSPCommunityFixes，减少每艘飞船上的自动刚化数量。\n2. 内存与 GC 卡顿：使用本 Mod 内置的【Mono 堆内存垫高器】(快捷键 Alt+End) 将虚拟堆垫高 2~4GB，即可将 GC 卡顿由几秒一次大幅延长至数十分钟一次。\n3. GPU 渲染卡顿：调低 TUFX / Scatterer 的阴影和抗锯齿倍率，关闭不必要的屏幕空间反射。",
-
     "msg_report_saved": "性能诊断报告已成功保存至:\nGameData/KSPPerformanceProfiler/Logs/{0}",
     "msg_report_fail": "保存性能报告失败: {0}",
     "msg_ui_opened": "已打开性能分析器窗口",
     "msg_ui_closed": "已关闭性能分析器窗口",
     "msg_hud_opened": "已切换至迷你监控 HUD",
-
     "sort_lock_on": "⏸️ 锁定排序",
     "sort_lock_off": "🔄 动态排序",
     "sort_refresh_now": "🔄 立即重新排序",
     "sort_lock_tip": "锁定当前表格行顺序，防止高频跳动闪烁，仅就地刷新数值",
-
     "spike_card_title": "⚡ 掉帧微卡顿精准抓拍 (Spike Sniffer)",
     "spike_none": "暂未捕获到异常掉帧尖峰 (系统平稳流畅)",
     "spike_history_count": "历史抓拍 ({0}/{1})",
@@ -177,7 +159,6 @@
     "spike_clear": "🗑️ 清空抓拍",
     "spike_unfreeze": "▶ 解除冻结",
     "spike_frozen_banner": "⏸️ 性能分析器已冻结！点击'解除冻结'继续实时监测",
-
     "graph_mode_stacked": "📊 多层宏观堆叠图",
     "graph_mode_curve": "📈 帧率双曲线 (FPS & 1% Low)",
     "graph_scale_label": "时间跨度:",
@@ -187,7 +168,6 @@
     "graph_curve_fps": "实时 FPS",
     "graph_curve_1pct": "1% Low FPS",
     "graph_spike_marker_tip": "红点 ▼ 标记帧时间骤升尖峰，点击即可定位分析",
-
     "asm_bar_title": "各程序集 (Mod DLL) 帧时间占比色条 (Assembly Budget Share)",
     "bn_btn_hide_advice": "▲ 收起建议",
     "bn_btn_show_advice": "▼ 查看建议",
@@ -197,7 +177,6 @@
     "culprit_gpu": "GPU 显卡渲染与着色器等待",
     "culprit_mono_gc": "Mono GC 垃圾回收停顿",
     "culprit_physx_joints": "PhysX 物理关节与碰撞",
-
     "pad_card_title": "⚡ Mono 堆内存防卡顿管理 (Heap Padder)",
     "pad_card_desc": "通过预先向系统申请充足的托管堆内存（Padheap），消除每几秒一次的 GC 停顿刺客！",
     "pad_ram_banner": "🖥️ <b>本机物理内存:</b> {0} GB ({1} MB) | <b>推荐垫高值:</b> <color=#33FF33><b>+{2} MB (+{3} GB)</b></color> (安全上限: {4} MB)",
@@ -220,7 +199,6 @@
     "pad_hero_advice": "检测到 GC 停顿引发卡顿！当前空闲缓冲不足。建议点击右侧【一键垫高堆内存】彻底消除 GC 刺客！",
     "pad_hero_btn": "⚡ 一键垫高堆内存",
     "pad_msg_gc_freed": "[KSPPerformanceProfiler] 🧹 GC 手动回收完成！释放了约 {0} MB 托管内存 (当前空闲: {1:F0} MB)",
-
     "graph_unlock_btn": "✕ 解锁",
     "graph_hover_locked": "🔒 [已锁定检视]",
     "graph_hover_tracking": "🔍 [悬停检视]",
@@ -228,6 +206,12 @@
     "graph_axis_60": "16.7ms (60F)",
     "graph_axis_30": "33.3ms (30F)",
     "graph_axis_20": "50.0ms (20F)",
-    "window_size_info": "📐 {0:F0}×{1:F0}"
+    "window_size_info": "📐 {0:F0}×{1:F0}",
+    "legend_spikes": "尖峰",
+    "graph_hover_frames_ago": "-{0} 帧",
+    "lang_btn_reload": "🔄 重新扫描语言包",
+    "pad_presets_label": "预设:",
+    "pad_btn_apply_rec": "★ 应用推荐值 (+{0} MB)",
+    "pad_msg_reminder": "💡 堆内存垫高器就绪：推荐为您的 {1} GB 物理内存垫高 {0} MB。可前往设置页或按 Alt+End 开启。"
   }
 }

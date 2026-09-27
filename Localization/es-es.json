@@ -206,6 +206,12 @@
     "graph_axis_60": "16.7ms (60F)",
     "graph_axis_30": "33.3ms (30F)",
     "graph_axis_20": "50.0ms (20F)",
-    "window_size_info": "📐 {0:F0}×{1:F0}"
+    "window_size_info": "📐 {0:F0}×{1:F0}",
+    "legend_spikes": "Picos",
+    "graph_hover_frames_ago": "-{0} fotogramas",
+    "lang_btn_reload": "🔄 Recargar paquetes de idioma",
+    "pad_presets_label": "Preajustes:",
+    "pad_btn_apply_rec": "★ Aplicar recomendado (+{0} MB)",
+    "pad_msg_reminder": "💡 Heap Padder disponible: se recomiendan {0} MB para sus {1} GB de RAM. Abra Configuración o presione Alt+End."
   }
 }
